@@ -8,7 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 # 1. Load data
-df = pd.read_csv("Crop_recommendation.csv")
+df = pd.read_csv("data/Crop_recommendation.csv")
 print("Shape:", df.shape)
 
 # 2. Clean data
@@ -59,4 +59,9 @@ new_data = pd.DataFrame([[90, 42, 43, 20.9, 82.0, 6.5, 203.0]], columns=X.column
 print("\nRecommended crop:", le.inverse_transform(model.predict(new_data))[0])
 
 # 10. Save the model for later use
-joblib.dump({"model": model, "label_encoder": le}, "random_forest_crop.joblib")
+
+
+joblib.dump(
+    {"model": model, "label_encoder": le},
+    "models/random_forest_crop.joblib"
+)
