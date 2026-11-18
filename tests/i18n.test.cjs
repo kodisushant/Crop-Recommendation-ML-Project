@@ -9,7 +9,7 @@ const root=path.resolve(__dirname,'..');
 function runtime(saved='en'){
     const context={window:{},localStorage:{getItem:()=>saved},document:{addEventListener(){}},console};
     vm.createContext(context);
-    for(const name of ['translations.js','translations-complete.js','translations-reports.js','translations-messages.js','translations-descriptions.js','translations-weather.js','i18n.js'])vm.runInContext(fs.readFileSync(path.join(root,'static/js',name),'utf8'),context);
+    for(const name of ['static/js/translations.js','static/js/translations-complete.js','static/js/translations-reports.js','static/js/translations-messages.js','static/js/translations-descriptions.js','static/js/translations-weather.js','user_history/static/translations.js','static/js/i18n.js'])vm.runInContext(fs.readFileSync(path.join(root,name),'utf8'),context);
     return context.window;
 }
 test('all advertised languages have complete core, crop and safety entries',()=>{

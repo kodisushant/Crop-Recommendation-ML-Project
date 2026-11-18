@@ -1,6 +1,7 @@
 """Crop Advisor - FastAPI backend. Serves the API (/docs) AND the website (templates + static)."""
 import os, time, logging, requests, numpy as np, pandas as pd
 from pathlib import Path
+from contextlib import asynccontextmanager
 from typing import Optional, Dict, Literal
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -14,13 +15,30 @@ except ImportError:
     pass
 import predictor as P
 import crop_data as C
+from user_history.routes import router as user_router, close_storage, COOKIE, require_same_origin, save_prediction_history
+
+
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    close_storage()
 
 BASE = Path(__file__).parent
 log = logging.getLogger("crop-advisor")
-app = FastAPI(title="Crop Advisor API", version="1.0",
+app = FastAPI(title="Crop Advisor API", version="1.0", lifespan=lifespan,
               description="AI crop recommendation with confidence, out-of-range detection and planning tools.")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
-templates = Jinja2Templates(directory=BASE / "templates")
+app.include_router(user_router)
+app.mount("/user-history/static", StaticFiles(directory=BASE / "user_history" / "static"), name="user-history-assets")
+
+
+@app.middleware("http")
+async def private_pages_no_cache(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/") or request.url.path in ("/history", "/login", "/register", "/predict"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+templates = Jinja2Templates(directory=[BASE / "templates", BASE / "user_history" / "templates"])
 FEATURES = P.FEATURES
 DF = P.DF
 API_KEY = os.getenv("DATA_GOV_API_KEY", "")
@@ -105,7 +123,8 @@ def run_predict(v):
 # ---------- pages ----------
 PAGES = {"": "index", "dashboard": "dashboard", "recommendation": "recommendation", "ideal-conditions": "ideal_conditions",
          "land-check": "land_check", "fertilizer": "fertilizer", "market": "market", "weather-forecast": "weather",
-         "profit": "profit", "what-if": "what_if", "rotation": "rotation", "model-performance": "model_performance"}
+         "profit": "profit", "what-if": "what_if", "rotation": "rotation", "model-performance": "model_performance",
+         "history": "history", "login": "login", "register": "register"}
 def _page(name):
     def h(request: Request): return templates.TemplateResponse(request, f"{name}.html", {"page": name})
     return h
@@ -165,7 +184,12 @@ def crop_detail(crop: str):
 
 # ---------- prediction ----------
 @app.post("/predict", tags=["Prediction"])
-def predict(c: Conditions): return run_predict(vals(c))
+def predict(c: Conditions, request: Request):
+    if request.cookies.get(COOKIE):
+        require_same_origin(request)
+    result = run_predict(vals(c))
+    result["history"] = save_prediction_history(request, c.model_dump(), result.copy())
+    return result
 
 def apply_changes(base, changes):
     new = dict(base)

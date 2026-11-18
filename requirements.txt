@@ -9,3 +9,5 @@ joblib==1.6.0
 matplotlib==3.11.2
 requests==2.34.2
 python-dotenv==1.0.1
+pymongo==4.20.0
+argon2-cffi>=21.3.0,<26

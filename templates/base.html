@@ -19,6 +19,7 @@
     
     <!-- Custom Stylesheet -->
     <link rel="stylesheet" href="/static/css/style.css?v=weather-language1">
+    <link rel="stylesheet" href="/user-history/static/style.css?v=1">
 </head>
 
 <body data-page="{{ page }}" data-analysis-mode="{{ 'soil' if soil_analysis else 'crop' }}">
@@ -64,6 +65,8 @@
                     </div>
                 </li>
                 {% endblock %}
+                <li><a href="/history">History</a></li>
+                <li class="account-nav"><a href="/login" id="account-link">Sign in</a><span id="account-name" translate="no" hidden></span><button type="button" id="sign-out" hidden>Sign out</button></li>
                 <li><a class="btn sm" href="/recommendation">Get Started</a></li>
             </ul>
         </div>
@@ -118,8 +121,11 @@
     <script src="/static/js/translations-messages.js?v=soil-analysis1"></script>
     <script src="/static/js/translations-descriptions.js?v=1"></script>
     <script src="/static/js/translations-weather.js?v=1"></script>
+    <script src="/user-history/static/translations.js?v=1"></script>
     <script src="/static/js/i18n.js?v=weather-language1"></script>
-    <script src="/static/js/script.js?v=weather-language1"></script>
+    <script src="/user-history/static/accounts.js?v=1"></script>
+    <script src="/user-history/static/history.js?v=1"></script>
+    <script src="/static/js/script.js?v=user-history1"></script>
 </body>
 
 </html>

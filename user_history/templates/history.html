@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}My history{% endblock %}
+{% block body %}
+<div class="app-head"><div class="wrap">
+    <h1>My history</h1>
+    <p>Your saved crop recommendations and soil analyses.</p>
+    <p class="note">Your history is private to your account.</p>
+</div></div>
+<main class="app"><div class="wrap">
+    <p id="history-message" class="note" role="status">Loading history...</p>
+    <a id="history-login" class="btn" href="/login" hidden>Sign in</a>
+    <div id="history-items" class="grid g2"></div>
+    <button id="history-more" type="button" class="btn ghost" hidden>Load more</button>
+    <div id="result" class="history-report" hidden></div>
+</div></main>
+{% endblock %}

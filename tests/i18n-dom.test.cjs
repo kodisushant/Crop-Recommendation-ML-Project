@@ -13,7 +13,8 @@ const crop={crop:'rice',seasons:'Kharif',family:'Poaceae',soil:'Clay / clay loam
 
 async function page(name='rotation',saved='en',responses={}){
     let base=read('templates/base.html');
-    const body=read(`templates/${name}.html`).split('{% block body %}')[1].split('{% endblock %}')[0];
+    const template=fs.existsSync(path.join(root,`templates/${name}.html`))?`templates/${name}.html`:`user_history/templates/${name}.html`;
+    const body=read(template).split('{% block body %}')[1].split('{% endblock %}')[0];
     const markup=base.replace('{% block body %}{% endblock %}',body)
         .replace('{{ page }}',name).replace(/{%[\s\S]*?%}/g,'');
     const errors=[];
@@ -24,10 +25,10 @@ async function page(name='rotation',saved='en',responses={}){
     w.localStorage.setItem('ca_language',saved);
     const requests=[];
     w.fetch=async(url,options)=>{
-        requests.push({url,body:options?.body?JSON.parse(options.body):undefined});
+        requests.push({url,body:options?.body?JSON.parse(options.body):undefined,method:options?.method,headers:options?.headers});
         assert.ok(url.startsWith('/'),'no external request: '+url);
         const data=responses[url]??({'/crops':[crop],'/crops/rice':crop,'/states':['Telangana'],
-            '/rotation':{suggestions:[],disclaimer:''},'/meta':{n_crops:22,test_accuracy:0.99,best_model:'Random Forest'}}[url]);
+            '/rotation':{suggestions:[],disclaimer:''},'/meta':{n_crops:22,test_accuracy:0.99,best_model:'Random Forest'},'/api/auth/me':{user:null}}[url]);
         assert.notEqual(data,undefined,'unmocked API: '+url);
         const result=typeof data==='function'?await data(url,options):data;
         return result.__http || {ok:true,json:async()=>result};
@@ -37,8 +38,10 @@ async function page(name='rotation',saved='en',responses={}){
     w.HTMLElement.prototype.scrollIntoView=function(){};
     // Wait for jsdom's own DOMContentLoaded before installing application scripts.
     await tick();
-    for(const file of ['translations','translations-complete','translations-reports','translations-messages','translations-descriptions','translations-weather','i18n','script'])w.eval(read(`static/js/${file}.js`));
+    Object.defineProperty(w.document,'readyState',{configurable:true,get:()=> 'loading'});
+    for(const file of ['static/js/translations.js','static/js/translations-complete.js','static/js/translations-reports.js','static/js/translations-messages.js','static/js/translations-descriptions.js','static/js/translations-weather.js','user_history/static/translations.js','static/js/i18n.js','user_history/static/accounts.js','user_history/static/history.js','static/js/script.js'])w.eval(read(file));
     w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+    Object.defineProperty(w.document,'readyState',{configurable:true,get:()=> 'complete'});
     await tick();
     return {dom,w,requests,errors};
 }
@@ -286,7 +289,7 @@ test('weather validation, provider errors and empty forecasts translate and allo
         const d=w.document,field=d.querySelector('#city'),form=d.querySelector('#form');
         field.value='';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
         assert.ok(d.querySelector('#result').textContent.includes(w.CropI18n.t('Please enter a city, district, or state name.')));
-        assert.equal(requests.length,0);
+        assert.equal(requests.filter(r=>!r.url.startsWith('/api/auth/')).length,0);
         field.value='Orange';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
         const english="Location 'Orange' not found. Please check the spelling and try another city, district, or state.";
         for(const code of ['te','hi','ur','en']){
@@ -312,7 +315,7 @@ test('weather suggestions keep canonical values and keyboard selection across la
         assert.equal(field.getAttribute('aria-activedescendant'),'weather-suggestion-0');
         field.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',cancelable:true}));
         assert.equal(field.value,'Orange, California');assert.equal(field.getAttribute('aria-expanded'),'false');
-        assert.equal(requests.length,1);
+        assert.equal(requests.filter(r=>!r.url.startsWith('/api/auth/')).length,1);
     }finally{dom.window.close();}
 });
 
@@ -340,4 +343,103 @@ test('weather provider errors display a typed location as text, never executable
         assert.ok(d.querySelector('#result').textContent.includes(city));
         assert.ok(d.querySelector('#result').textContent.includes(w.CropI18n.t(message)));
     }finally{dom.window.close();}
+});
+
+test('account forms and history instructions translate without changing typed credentials',async()=>{
+    for(const name of ['login','register','history']){
+        const {dom,w,errors}=await page(name);
+        try{
+            const d=w.document;
+            const nodes=[...d.querySelectorAll('main h1,main p,main label,main button,main a,.app-head h1,.app-head p')]
+                .map(element=>({element,source:element.textContent.trim()})).filter(item=>item.source);
+            const username=d.querySelector('#username'),password=d.querySelector('#password');
+            if(username)username.value='Rice';if(password)password.value='test-only-password';
+            for(const [code]of w.CropTranslations.languages){
+                w.CropI18n.setLanguage(code);await tick();
+                for(const {element,source}of nodes){
+                    assert.equal(element.textContent.trim(),w.CropI18n.t(source),name+' '+code+' '+source);
+                    if(code!=='en')assert.notEqual(w.CropI18n.t(source),source,code+' '+source);
+                }
+                if(username)assert.equal(username.value,'Rice');if(password)assert.equal(password.value,'test-only-password');
+            }
+            assert.deepEqual(errors,[]);
+        }finally{dom.window.close();}
+    }
+});
+
+test('registration validation and server messages translate without storing passwords',async()=>{
+    const {dom,w,requests}=await page('register','te',{'/api/auth/register':{__http:{ok:false,status:409,json:async()=>({detail:'This username is already taken.'})}}});
+    try{
+        const d=w.document,form=d.querySelector('#account-form');
+        const username=d.querySelector('#username'),password=d.querySelector('#password'),confirm=d.querySelector('#confirm-password');
+        username.value='Rice';password.value='test-only-password';confirm.value='different-password';
+        form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+        assert.equal(d.querySelector('#account-message').textContent,w.CropI18n.t('Passwords do not match.'));
+        assert.equal(requests.filter(r=>r.url==='/api/auth/register').length,0);
+        confirm.value=password.value;
+        form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+        assert.equal(d.querySelector('#account-message').textContent,w.CropI18n.t('This username is already taken.'));
+        const sent=requests.filter(r=>r.url==='/api/auth/register').at(-1);
+        assert.equal(sent.headers['X-Crop-Request'],'1');assert.equal(sent.body.username,'Rice');
+        assert.equal(d.querySelector('#account-submit').disabled,false);
+        for(let index=0;index<w.localStorage.length;index++)assert.ok(!String(w.localStorage.getItem(w.localStorage.key(index))).includes(password.value));
+    }finally{dom.window.close();}
+});
+
+test('saved history translates, paginates and opens/deletes reports using stable IDs',async()=>{
+    const prediction={status:'OK',crop:'rice',confidence_label:'High',top_k:[{crop:'rice',probability:0.95}],reasons:[],
+        normalized_entropy:0.1,margin:0.9,stability_change_rate:0,stability_runs:40,out_of_range_check:{distance:1,threshold:10},
+        note:'Probability is not a guarantee of crop success.',explanation:[{feature:'N',value:90,effect:0.1}]};
+    const first={id:'000000000000000000000003',created_at:'2026-11-18T12:00:00+00:00',source:'soil-analysis',inputs:{N:90,P:42,K:43,ph:6.5},crop:'rice',status:'OK',confidence_label:'High',probability:0.95};
+    const second={...first,id:'000000000000000000000002',crop:null,status:'OUT_OF_RANGE',probability:null};
+    const last={...first,id:'000000000000000000000001'};
+    const responses={
+        '/api/auth/me':{user:{id:'private-owner',username:'Rice',role:'user'}},
+        '/api/history?limit=20':{items:[first,second],next_cursor:second.id},
+        ['/api/history?limit=20&before='+second.id]:{items:[last],next_cursor:null},
+        ['/api/history/'+first.id]:(url,options)=>options.method==='DELETE'?{deleted:true}:{...first,result:prediction}
+    };
+    const {dom,w,requests,errors}=await page('history','te',responses);
+    try{
+        const d=w.document;
+        assert.equal(d.querySelectorAll('#history-items article').length,2);
+        for(const [code]of w.CropTranslations.languages){
+            w.CropI18n.setLanguage(code);await tick();
+            assert.equal(d.querySelector('#account-name').textContent,'Rice');
+            assert.equal(d.querySelector('#history-items h3').textContent,w.CropI18n.t('Rice'));
+            assert.equal(d.querySelector('[data-action="view"]').textContent,w.CropI18n.t('View report'));
+            assert.equal(d.querySelector('#history-items td').textContent,'90');
+            assert.equal(d.querySelector('#history-items article').dataset.id,first.id);
+        }
+        d.querySelector('[data-action="view"]').click();await tick();
+        assert.equal(d.querySelector('#result').hidden,false);assert.ok(d.querySelector('#c-exp'));
+        d.querySelector('#history-more').click();await tick();
+        assert.equal(d.querySelectorAll('#history-items article').length,3);
+        assert.equal(d.querySelector('#history-more').hidden,true);
+        w.confirm=()=>true;d.querySelector('[data-action="delete"]').click();await tick();
+        assert.equal(d.querySelectorAll('#history-items article').length,2);
+        assert.equal(d.querySelector('#result').hidden,true);
+        const deletion=requests.find(r=>r.method==='DELETE');assert.equal(deletion.url,'/api/history/'+first.id);
+        assert.equal(deletion.headers['X-Crop-Request'],'1');
+        assert.equal(w.localStorage.getItem('ca_hist'),null);assert.deepEqual(errors,[]);
+    }finally{dom.window.close();}
+});
+
+test('history storage outages and unsaved model results are explicit and translated',async()=>{
+    const failure={__http:{ok:false,status:503,json:async()=>({detail:'Account and history storage is unavailable. Please try again.'})}};
+    const history=await page('history','te',{'/api/auth/me':failure});
+    try{
+        assert.equal(history.w.document.querySelector('#history-message').textContent,history.w.CropI18n.t('Account and history storage is unavailable. Please try again.'));
+        assert.equal(history.w.document.querySelector('#history-login').hidden,false);
+    }finally{history.dom.window.close();}
+    const result={status:'OUT_OF_RANGE',crop:null,top_k:[],explanation:[],reasons:[],normalized_entropy:0.1,margin:0,
+        stability_change_rate:0,stability_runs:40,out_of_range_check:{distance:9,threshold:4},note:'Probability is not a guarantee of crop success.',
+        history:{saved:false,reason:'storage_unavailable'}};
+    const prediction=await page('recommendation','te',{'/predict':result});
+    try{
+        const d=prediction.w.document;d.querySelector('#predict-form').dispatchEvent(new prediction.w.Event('submit',{cancelable:true}));await tick();
+        assert.ok(d.querySelector('#result .alert.bad'));
+        assert.ok(d.querySelector('#result').textContent.includes(prediction.w.CropI18n.t('This result could not be saved. Please try again later.')));
+        assert.equal(d.querySelector('#go').disabled,false);
+    }finally{prediction.dom.window.close();}
 });

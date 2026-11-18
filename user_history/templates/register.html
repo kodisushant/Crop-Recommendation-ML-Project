@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Create account{% endblock %}
+{% block body %}
+<main class="app"><div class="wrap account-wrap">
+    <h1>Create account</h1>
+    <p>Sign in to save and view your history across devices.</p>
+    <form id="account-form" class="panel">
+        <label for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_.-]+" required>
+        <p class="hint">Use 3–32 English letters, numbers, dots, underscores or hyphens.</p>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+        <p class="hint">Use 12–128 characters for your password.</p>
+        <label for="confirm-password">Confirm password</label>
+        <input id="confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+        <button id="account-submit" class="btn" type="submit">Create account</button>
+        <p id="account-message" class="note" role="status"></p>
+    </form>
+    <a href="/login">Sign in</a>
+</div></main>
+{% endblock %}

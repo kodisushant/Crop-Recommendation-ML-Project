@@ -7,7 +7,7 @@
 <div class="app-head">
     <div class="wrap">
         <h1>Dashboard</h1>
-        <p>Your overview of model performance metrics, quick tools, and recent local predictions.</p>
+        <p>Your overview of model performance and saved history.</p>
     </div>
 </div>
 
@@ -100,13 +100,11 @@
             <!-- Recent Predictions Table -->
             <div>
                 <div class="panel tw">
-                    <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Predictions (This Browser)</h3>
+                    <h3><i class="fa-solid fa-clock-rotate-left"></i> My history</h3>
                     <table>
                         <tbody id="hist"></tbody>
                     </table>
-                    <button class="btn ghost sm" id="clear-hist" style="margin-top:10px">
-                        Clear History
-                    </button>
+                    <a class="btn ghost sm" href="/history" style="margin-top:10px">View all history</a>
                 </div>
 
                 <div class="panel">

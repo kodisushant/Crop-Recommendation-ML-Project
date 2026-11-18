@@ -93,6 +93,7 @@ const FIELD_DEFINITIONS = {
         step: 0.1
     }
 };
+window.CropFields = FIELD_DEFINITIONS;
 
 /** Palette for charts and graphical elements */
 const CHART_COLORS = [
@@ -160,14 +161,19 @@ function showToast(message, type = "ok") {
  * @param {object|null} requestBody - Optional request payload for POST requests
  * @returns {Promise<object>} Parsed JSON response
  */
-async function fetchApi(url, requestBody = null) {
+async function fetchApi(url, requestBody = null, method = null) {
     let response;
     try {
-        const fetchOptions = requestBody ? {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestBody)
-        } : undefined;
+        const fetchOptions = {
+            method: method || (requestBody !== null ? 'POST' : 'GET'),
+            credentials: 'same-origin',
+            headers: {'X-Crop-Request':'1'}
+        };
+        if(requestBody !== null){
+            fetchOptions.headers['Content-Type']='application/json';
+            fetchOptions.body=JSON.stringify(requestBody);
+        }
+        if(url==='/predict')fetchOptions.headers['X-Activity-Source']=document.body.dataset.analysisMode==='soil'?'soil-analysis':'recommendation';
 
         response = await fetch(url, fetchOptions);
     } catch (networkError) {
@@ -184,7 +190,9 @@ async function fetchApi(url, requestBody = null) {
                 .map(err => `${(err.loc || []).slice(-1)[0]}: ${err.msg}`)
                 .join("; ");
         }
-        throw new Error(errorMessage || `Request failed with status ${response.status}`);
+        const error=new Error(errorMessage || `Request failed with status ${response.status}`);
+        error.status=response.status;
+        throw error;
     }
 
     return jsonResponse;
@@ -465,40 +473,9 @@ pageControllers.dashboard = async function () {
         }
     });
 
-    // 4. Render prediction history from localStorage
-    const historyContainer = getElement("#hist");
-    const rawHistory = JSON.parse(localStorage.getItem("ca_hist") || "[]");
-
-    if (rawHistory.length > 0) {
-        historyContainer.innerHTML = rawHistory.map(entry => {
-            const dateStr = new Date(entry.t).toLocaleString();
-            const cropName = entry.crop ? capitalizeFirstLetter(entry.crop) : "–";
-            const badgeClass = entry.status === "OK" ? "ok" : entry.status === "LOW_CONFIDENCE" ? "low" : "out";
-            return `
-                <tr>
-                    <td>${dateStr}</td>
-                    <td><b>${cropName}</b></td>
-                    <td>${renderBadge(badgeClass, entry.status.replace("_", " "))}</td>
-                </tr>
-            `;
-        }).join("");
-    } else {
-        historyContainer.innerHTML = `
-            <tr>
-                <td colspan="3">${renderEmptyPlaceholder("fa-clock-rotate-left", "No predictions yet. Run one on the recommendation page.")}</td>
-            </tr>
-        `;
-    }
-
-    // 5. Clear history button event listener
-    const clearHistoryButton = getElement("#clear-hist");
-    if (clearHistoryButton) {
-        clearHistoryButton.onclick = function () {
-            localStorage.removeItem("ca_hist");
-            showToast("Prediction history cleared");
-            pageControllers.dashboard();
-        };
-    }
+    // History belongs to the signed-in account and is read from MongoDB.
+    await window.CropHistory.recent();
+    document.addEventListener('languagechange',()=>window.CropHistory.recent());
 };
 
 // ----------------------------------------------------------------------------
@@ -510,7 +487,8 @@ pageControllers.recommendation = async function () {
     const formElement = getElement("#predict-form");
 
     // 1. Populate states dynamically and restore saved input values
-    populateStateDropdown(stateSelect);
+    await populateStateDropdown(stateSelect);
+    if(getLastSavedFormValues().state)stateSelect.value=getLastSavedFormValues().state;
     restoreFieldInputs(Object.keys(FIELD_DEFINITIONS));
 
     // 2. Pre-fill typical Rice example values
@@ -540,15 +518,15 @@ pageControllers.recommendation = async function () {
             // Display results in UI
             displayRecommendationResult(predictionResult);
 
-            // Append to local prediction history (keep last 6)
-            const history = JSON.parse(localStorage.getItem("ca_hist") || "[]");
-            history.unshift({
-                t: Date.now(),
-                crop: predictionResult.crop,
-                status: predictionResult.status,
-                p: predictionResult.top_k && predictionResult.top_k[0] ? predictionResult.top_k[0].probability : null
-            });
-            localStorage.setItem("ca_hist", JSON.stringify(history.slice(0, 6)));
+            // The server saves signed-in predictions. Never claim a save when
+            // MongoDB is unavailable, and keep showing the model result.
+            const saved=predictionResult.history;
+            if(saved){
+                const message=document.createElement('p');message.className='note';
+                message.textContent=saved.saved?'Saved to your history.':saved.reason==='storage_unavailable'?
+                    'This result could not be saved. Please try again later.':'Sign in to save and view your history across devices.';
+                getElement('#result').append(message);
+            }
 
             // Smooth scroll to result
             getElement("#result").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1753,6 +1731,10 @@ pageControllers.weather = function () {
 // ============================================================================
 // 5. APPLICATION BOOTSTRAPPER
 // ============================================================================
+
+pageControllers.login=()=>window.CropAccount.bindForm('login');
+pageControllers.register=()=>window.CropAccount.bindForm('register');
+pageControllers.history=()=>window.CropHistory.start();
 
 function initApp() {
     // Mobile navigation burger menu toggle
