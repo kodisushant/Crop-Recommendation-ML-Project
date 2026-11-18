@@ -881,6 +881,22 @@ footer a:hover {
 /* --------------------------------------------------------------------------
    8. Responsive Media Queries
    -------------------------------------------------------------------------- */
+.language-picker { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.language-picker label { margin:0; font-size:.85rem; white-space:nowrap; }
+.language-picker select { width:auto; min-width:105px; max-width:155px; padding:7px 10px; margin:0; }
+.language-notice { font-size:.85rem; color:var(--muted); padding-block:10px; }
+.language-notice[hidden] { display:none; }
+html:not([lang="en"]) { --ff:system-ui,"Noto Sans",sans-serif; --fd:system-ui,"Noto Sans",sans-serif; }
+html:not([lang="en"]) .nav .wrap { height:auto; min-height:64px; flex-wrap:wrap; padding-block:8px; }
+html:not([lang="en"]) h1, html:not([lang="en"]) h2, html:not([lang="en"]) h3 { line-height:1.5; letter-spacing:normal; }
+html[dir="rtl"] body { text-align:right; }
+html[dir="rtl"] .dd-m { right:auto; left:0; }
+html[dir="rtl"] input[type="number"], html[dir="rtl"] canvas { direction:ltr; }
+html[dir="rtl"] table { text-align:right; }
+@media (max-width:1100px) { .nav .wrap { height:auto; min-height:64px; flex-wrap:wrap; padding-block:8px; } .language-picker { margin-inline-start:auto; } }
+@media (max-width:820px) { .language-picker { order:2; } .burger { order:3; } .menu { top:100%; } .language-picker label { font-size:.8rem; } }
+@media (max-width:480px) { .nav .wrap { gap:8px; } .brand { font-size:.85rem; gap:5px; } .brand img { width:25px; height:25px; } .language-picker label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); } .language-picker select { min-width:90px; max-width:110px; } }
+
 @media (max-width: 960px) {
     .g4 { grid-template-columns: repeat(2, 1fr); }
     .g3 { grid-template-columns: repeat(2, 1fr); }

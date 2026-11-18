@@ -211,6 +211,7 @@ function renderChart(canvasId, chartConfig) {
     );
 
     activeChartInstances[canvasId] = new Chart(canvasElement, chartConfig);
+    window.CropI18n?.registerChart(activeChartInstances[canvasId]);
 }
 
 /**
@@ -708,7 +709,8 @@ pageControllers.ideal_conditions = async function () {
         const selectedSeason = seasonFilter.value;
 
         const filtered = detailedCrops.filter(c => {
-            const matchesQuery = c.crop.toLowerCase().includes(query);
+            const localName = window.CropI18n?.t(capitalizeFirstLetter(c.crop)) || c.crop;
+            const matchesQuery = c.crop.toLowerCase().includes(query) || localName.toLowerCase().includes(query);
             const matchesSeason = !selectedSeason || c.seasons.includes(selectedSeason);
             return matchesQuery && matchesSeason;
         });
@@ -745,6 +747,7 @@ pageControllers.ideal_conditions = async function () {
 
     searchInput.oninput = renderFilteredCards;
     seasonFilter.onchange = renderFilteredCards;
+    document.addEventListener('languagechange', renderFilteredCards);
     renderFilteredCards();
 };
 

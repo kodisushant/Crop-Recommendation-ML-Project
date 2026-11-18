@@ -1,4 +1,6 @@
 # CROP ADVISOR – Grow Smarter. Harvest Better.
+
+Regional language selector: English plus 12 major Indian languages, remembered across pages; Urdu includes RTL layout. Main controls, crop names, status messages and chart labels use offline dictionaries. Unreviewed detailed technical text remains English with a visible notice. See [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md) for coverage, limitations and translation-review guidance.
 AI crop recommendation (22 crops) with confidence, out-of-range detection and planning tools. FastAPI serves both the API and the website.
 
 ## Honest scope notes
