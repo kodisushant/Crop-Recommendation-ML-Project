@@ -25,6 +25,7 @@ FEATURES = P.FEATURES
 DF = P.DF
 API_KEY = os.getenv("DATA_GOV_API_KEY", "")
 RESOURCE = os.getenv("DATA_GOV_RESOURCE_ID", "9ef84268-d588-465a-a308-a864a43d0070")
+REQ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
 # ---------- dataset-derived ranges ----------
 RANGES = {}
@@ -133,7 +134,7 @@ def states():
     out = {"source": "local fallback list", "states": C.STATES}
     if API_KEY:
         try:
-            r = requests.get(f"https://api.data.gov.in/resource/{RESOURCE}", timeout=8,
+            r = requests.get(f"https://api.data.gov.in/resource/{RESOURCE}", headers=REQ_HEADERS, timeout=15,
                 params={"api-key": API_KEY, "format": "json", "limit": 1000, "fields": "state"})
             r.raise_for_status()
             live = {x["state"].strip() for x in r.json().get("records", []) if x.get("state")}
@@ -271,7 +272,7 @@ def market(crop: str, state: Optional[str] = None):
         try:
             params = {"api-key": API_KEY, "format": "json", "limit": 50, "filters[commodity]": C.AGMARK[crop]}
             if state: params["filters[state]"] = state
-            r = requests.get(f"https://api.data.gov.in/resource/{RESOURCE}", params=params, timeout=10)
+            r = requests.get(f"https://api.data.gov.in/resource/{RESOURCE}", headers=REQ_HEADERS, params=params, timeout=15)
             r.raise_for_status()
             recs = [{"state": x.get("state"), "market": x.get("market"), "date": x.get("arrival_date"),
                      "min": float(x["min_price"]), "max": float(x["max_price"]), "modal": float(x["modal_price"])}

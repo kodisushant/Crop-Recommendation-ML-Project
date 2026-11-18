@@ -1,1 +1,25 @@
-{% extends "base.html" %}{% block title %}Crop Recommendation{% endblock %}{% block body %}<div class="app-head"><div class="wrap"><h1>Crop Recommendation</h1><p>Enter your soil and weather conditions. The trained model returns a crop, its confidence and an honest warning when the input is unusual.</p></div></div><main class="app"><div class="wrap"><div class="two"><form id="predict-form" novalidate><div id="fields"></div><div class="inl"><button class="btn" id="go" type="submit"><span class="spinner"></span><i class="fa-solid fa-wand-magic-sparkles"></i> Recommend crop</button><button type="button" class="btn ghost" id="fill-example"><i class="fa-solid fa-flask-vial"></i> Use example</button></div></form><div id="result"><div class="panel"><div class="empty"><i class="fa-solid fa-seedling"></i>Your results will appear here.</div></div></div></div></div></main>{% endblock %}
+{% extends "base.html" %}{% block title %}Crop Recommendation{% endblock %}{% block body %}<div class="app-head">
+    <div class="wrap">
+        <h1>Crop Recommendation</h1>
+        <p>Enter your soil and weather conditions. The trained model returns a crop, its confidence and an honest
+            warning when the input is unusual.</p>
+    </div>
+</div>
+<main class="app">
+    <div class="wrap">
+        <div class="two">
+            <form id="predict-form" novalidate>
+                <div id="fields"></div>
+                <div class="inl"><button class="btn" id="go" type="submit"><span class="spinner"></span><i
+                            class="fa-solid fa-wand-magic-sparkles"></i> Recommend crop</button><button type="button"
+                        class="btn ghost" id="fill-example"><i class="fa-solid fa-flask-vial"></i> Use example</button>
+                </div>
+            </form>
+            <div id="result">
+                <div class="panel">
+                    <div class="empty"><i class="fa-solid fa-seedling"></i>Your results will appear here.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>{% endblock %}

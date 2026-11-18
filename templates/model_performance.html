@@ -1,1 +1,52 @@
-{% extends "base.html" %}{% block title %}Model Performance{% endblock %}{% block body %}<div class="app-head"><div class="wrap"><h1>Model Performance</h1><p>How the eight classifiers compare, how reliable the chosen model is, and where it can fail.</p></div></div><main class="app"><div class="wrap"><div class="panel"><h3><i class="fa-solid fa-trophy"></i> Selected model</h3><p id="best" style="font-size:1.2rem;font-weight:600"></p><div class="note">Rule: highest 5-fold CV accuracy; models within 0.005 are tied and ranked by CV macro-F1. Random Forest was chosen among the tied models because its probabilities suit confidence analysis.</div></div><div class="panel tw"><h3><i class="fa-solid fa-table"></i> Model comparison</h3><table id="cmp"></table></div><div class="grid g2"><div class="panel"><h3>Class-wise F1</h3><div class="chart-box"><canvas id="c-cw"></canvas></div></div><div class="panel"><h3>Robustness (20% of std noise / missing feature)</h3><div class="chart-box"><canvas id="c-rb"></canvas></div><div class="note" id="rb-all"></div></div></div><div class="grid g2 imgs"><div class="panel"><h3>Model comparison</h3><img src="/plots/model_comparison.png" alt="Model comparison chart"></div><div class="panel"><h3>Confusion matrix</h3><img src="/plots/confusion_matrix.png" alt="Confusion matrix"></div></div><div class="panel"><h3><i class="fa-solid fa-sitemap"></i> Decision rules (illustrative depth-4 tree)</h3><pre class="rules" id="rules"></pre></div><div class="alert"><b>Limitations</b><ul><li>The dataset is clean and well-separated, so ~99% accuracy is expected here and will be lower on real, messy farm data.</li><li>Probabilities are model scores, not agricultural certainty.</li><li>Out-of-range detection misses combinations where every value looks normal alone.</li><li>State, season and soil type are not model inputs (not in the dataset).</li></ul></div></div></main>{% endblock %}
+{% extends "base.html" %}{% block title %}Model Performance{% endblock %}{% block body %}<div class="app-head">
+    <div class="wrap">
+        <h1>Model Performance</h1>
+        <p>How the eight classifiers compare, how reliable the chosen model is, and where it can fail.</p>
+    </div>
+</div>
+<main class="app">
+    <div class="wrap">
+        <div class="panel">
+            <h3><i class="fa-solid fa-trophy"></i> Selected model</h3>
+            <p id="best" style="font-size:1.2rem;font-weight:600"></p>
+            <div class="note">Rule: highest 5-fold CV accuracy; models within 0.005 are tied and ranked by CV macro-F1.
+                Random Forest was chosen among the tied models because its probabilities suit confidence analysis.</div>
+        </div>
+        <div class="panel tw">
+            <h3><i class="fa-solid fa-table"></i> Model comparison</h3>
+            <table id="cmp"></table>
+        </div>
+        <div class="grid g2">
+            <div class="panel">
+                <h3>Class-wise F1</h3>
+                <div class="chart-box"><canvas id="c-cw"></canvas></div>
+            </div>
+            <div class="panel">
+                <h3>Robustness (20% of std noise / missing feature)</h3>
+                <div class="chart-box"><canvas id="c-rb"></canvas></div>
+                <div class="note" id="rb-all"></div>
+            </div>
+        </div>
+        <div class="grid g2 imgs">
+            <div class="panel">
+                <h3>Model comparison</h3><img src="/plots/model_comparison.png" alt="Model comparison chart">
+            </div>
+            <div class="panel">
+                <h3>Confusion matrix</h3><img src="/plots/confusion_matrix.png" alt="Confusion matrix">
+            </div>
+        </div>
+        <div class="panel">
+            <h3><i class="fa-solid fa-sitemap"></i> Decision rules (illustrative depth-4 tree)</h3>
+            <pre class="rules" id="rules"></pre>
+        </div>
+        <div class="alert"><b>Limitations</b>
+            <ul>
+                <li>The dataset is clean and well-separated, so ~99% accuracy is expected here and will be lower on
+                    real, messy farm data.</li>
+                <li>Probabilities are model scores, not agricultural certainty.</li>
+                <li>Out-of-range detection misses combinations where every value looks normal alone.</li>
+                <li>State, season and soil type are not model inputs (not in the dataset).</li>
+            </ul>
+        </div>
+    </div>
+</main>{% endblock %}

@@ -1,1 +1,48 @@
-{% extends "base.html" %}{% block title %}What-If Analysis{% endblock %}{% block body %}<div class="app-head"><div class="wrap"><h1>What-If Analysis</h1><p>Change inputs and see how the model's recommendation and probabilities move. Sweep a feature to find tipping points.</p></div></div><main class="app"><div class="wrap"><div class="two"><div><form id="form" novalidate><div class="panel"><h3><i class="fa-solid fa-seedling"></i> Base conditions</h3><div id="fields"></div></div><div class="panel"><h3><i class="fa-solid fa-sliders"></i> Changes</h3><div id="changes"></div><div class="inl"><button type="button" class="btn ghost sm" id="add-change"><i class="fa-solid fa-plus"></i> Add change</button></div></div><button class="btn" id="go" type="submit"><span class="spinner"></span><i class="fa-solid fa-code-compare"></i> Compare</button></form></div><div id="result"><div class="panel"><div class="empty"><i class="fa-solid fa-seedling"></i>Your results will appear here.</div></div></div></div><div class="two" style="margin-top:24px"><form id="sweep-form" class="panel"><h3><i class="fa-solid fa-chart-line"></i> Sweep one feature</h3><div class="fg"><div><label for="sw-f">Feature</label><select id="sw-f"></select></div><div><label for="sw-a">From</label><input id="sw-a" type="number" step="any"></div><div><label for="sw-b">To</label><input id="sw-b" type="number" step="any"></div><div><label for="sw-n">Steps</label><input id="sw-n" type="number" value="15" min="3" max="60"></div></div><p class="hint">Uses the base conditions above.</p><button class="btn" id="sw-go" type="submit"><span class="spinner"></span><i class="fa-solid fa-play"></i> Run sweep</button></form><div id="sweep-result"></div></div></div></main>{% endblock %}
+{% extends "base.html" %}{% block title %}What-If Analysis{% endblock %}{% block body %}<div class="app-head">
+    <div class="wrap">
+        <h1>What-If Analysis</h1>
+        <p>Change inputs and see how the model's recommendation and probabilities move. Sweep a feature to find tipping
+            points.</p>
+    </div>
+</div>
+<main class="app">
+    <div class="wrap">
+        <div class="two">
+            <div>
+                <form id="form" novalidate>
+                    <div class="panel">
+                        <h3><i class="fa-solid fa-seedling"></i> Base conditions</h3>
+                        <div id="fields"></div>
+                    </div>
+                    <div class="panel">
+                        <h3><i class="fa-solid fa-sliders"></i> Changes</h3>
+                        <div id="changes"></div>
+                        <div class="inl"><button type="button" class="btn ghost sm" id="add-change"><i
+                                    class="fa-solid fa-plus"></i> Add change</button></div>
+                    </div><button class="btn" id="go" type="submit"><span class="spinner"></span><i
+                            class="fa-solid fa-code-compare"></i> Compare</button>
+                </form>
+            </div>
+            <div id="result">
+                <div class="panel">
+                    <div class="empty"><i class="fa-solid fa-seedling"></i>Your results will appear here.</div>
+                </div>
+            </div>
+        </div>
+        <div class="two" style="margin-top:24px">
+            <form id="sweep-form" class="panel">
+                <h3><i class="fa-solid fa-chart-line"></i> Sweep one feature</h3>
+                <div class="fg">
+                    <div><label for="sw-f">Feature</label><select id="sw-f"></select></div>
+                    <div><label for="sw-a">From</label><input id="sw-a" type="number" step="any"></div>
+                    <div><label for="sw-b">To</label><input id="sw-b" type="number" step="any"></div>
+                    <div><label for="sw-n">Steps</label><input id="sw-n" type="number" value="15" min="3" max="60">
+                    </div>
+                </div>
+                <p class="hint">Uses the base conditions above.</p><button class="btn" id="sw-go" type="submit"><span
+                        class="spinner"></span><i class="fa-solid fa-play"></i> Run sweep</button>
+            </form>
+            <div id="sweep-result"></div>
+        </div>
+    </div>
+</main>{% endblock %}

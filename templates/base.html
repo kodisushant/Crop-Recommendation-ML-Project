@@ -1,19 +1,72 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}Crop Advisor{% endblock %} | Crop Advisor</title><meta name="description" content="AI-powered crop recommendations, soil insights and agricultural planning tools.">
-<link rel="icon" href="/static/images/favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="/static/css/style.css"></head>
-<body data-page="{{ page }}"><header class="nav"><div class="wrap"><a class="brand" href="/"><img src="/static/images/logo.svg" alt="">CROP ADVISOR</a>
-<button class="burger" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
-<ul class="menu">{% block links %}<li><a href="/">Home</a></li><li><a href="/dashboard">Dashboard</a></li><li><a href="/recommendation">Recommend</a></li>
-<li class="dd"><button type="button">Tools <i class="fa-solid fa-chevron-down"></i></button><div class="dd-m"><a href="/ideal-conditions"><i class="fa-solid fa-ruler-combined"></i>Ideal Conditions</a><a href="/land-check"><i class="fa-solid fa-map"></i>Land Suitability</a><a href="/fertilizer"><i class="fa-solid fa-flask"></i>Fertilizer Planning</a><a href="/market"><i class="fa-solid fa-chart-line"></i>Market Prices</a><a href="/profit"><i class="fa-solid fa-indian-rupee-sign"></i>Profit Estimation</a><a href="/what-if"><i class="fa-solid fa-sliders"></i>What-If Analysis</a><a href="/rotation"><i class="fa-solid fa-rotate"></i>Crop Rotation</a><a href="/model-performance"><i class="fa-solid fa-gauge-high"></i>Model Performance</a></div></li>{% endblock %}
-<li><a class="btn sm" href="/recommendation">Get Started</a></li></ul></div></header>
-{% block body %}{% endblock %}
-<footer><div class="wrap"><div class="grid g4"><div><h3>Crop Advisor</h3><p>Grow Smarter. Harvest Better.</p></div>
-<div><h3>Features</h3><a href="/recommendation">Crop Recommendation</a><a href="/land-check">Land Suitability</a><a href="/fertilizer">Fertilizer Planning</a><a href="/market">Market Prices</a></div>
-<div><h3>Useful links</h3><a href="/dashboard">Dashboard</a><a href="/model-performance">Model Performance</a><a href="/docs">API Docs</a><a href="https://data.gov.in" rel="noopener" target="_blank">data.gov.in</a></div>
-<div><h3>Contact</h3><p>Email: contact@example.com (placeholder)</p></div></div>
-<p class="disc">Disclaimer: Crop Advisor is a decision-support tool built on a research dataset. Recommendations, prices, doses and profit figures are indicative estimates, not professional agronomic advice or guaranteed outcomes. Consult your local Krishi Vigyan Kendra or agricultural university before acting.</p></div></footer>
-<div id="toasts" aria-live="polite"></div>
-<script src="/static/js/chart.umd.js"></script><script src="/static/js/script.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{% block title %}Crop Advisor{% endblock %} | Crop Advisor</title>
+    <meta name="description" content="AI-powered crop recommendations, soil insights and agricultural planning tools.">
+    <link rel="icon" href="/static/images/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body data-page="{{ page }}">
+    <header class="nav">
+        <div class="wrap"><a class="brand" href="/"><img src="/static/images/logo.svg" alt="">CROP ADVISOR</a>
+            <button class="burger" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+            <ul class="menu">{% block links %}<li><a href="/">Home</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/recommendation">Recommend</a></li>
+                <li class="dd"><button type="button">Tools <i class="fa-solid fa-chevron-down"></i></button>
+                    <div class="dd-m"><a href="/ideal-conditions"><i class="fa-solid fa-ruler-combined"></i>Ideal
+                            Conditions</a><a href="/land-check"><i class="fa-solid fa-map"></i>Land Suitability</a><a
+                            href="/fertilizer"><i class="fa-solid fa-flask"></i>Fertilizer Planning</a><a
+                            href="/market"><i class="fa-solid fa-chart-line"></i>Market Prices</a><a href="/profit"><i
+                                class="fa-solid fa-indian-rupee-sign"></i>Profit Estimation</a><a href="/what-if"><i
+                                class="fa-solid fa-sliders"></i>What-If Analysis</a><a href="/rotation"><i
+                                class="fa-solid fa-rotate"></i>Crop Rotation</a><a href="/model-performance"><i
+                                class="fa-solid fa-gauge-high"></i>Model Performance</a></div>
+                </li>{% endblock %}
+                <li><a class="btn sm" href="/recommendation">Get Started</a></li>
+            </ul>
+        </div>
+    </header>
+    {% block body %}{% endblock %}
+    <footer>
+        <div class="wrap">
+            <div class="grid g4">
+                <div>
+                    <h3>Crop Advisor</h3>
+                    <p>Grow Smarter. Harvest Better.</p>
+                </div>
+                <div>
+                    <h3>Features</h3><a href="/recommendation">Crop Recommendation</a><a href="/land-check">Land
+                        Suitability</a><a href="/fertilizer">Fertilizer Planning</a><a href="/market">Market Prices</a>
+                </div>
+                <div>
+                    <h3>Useful links</h3><a href="/dashboard">Dashboard</a><a href="/model-performance">Model
+                        Performance</a><a href="/docs">API Docs</a><a href="https://data.gov.in" rel="noopener"
+                        target="_blank">data.gov.in</a>
+                </div>
+                <div>
+                    <h3>Contact</h3>
+                    <p>Email: contact@example.com (placeholder)</p>
+                </div>
+            </div>
+            <p class="disc">Disclaimer: Crop Advisor is a decision-support tool built on a research dataset.
+                Recommendations, prices, doses and profit figures are indicative estimates, not professional agronomic
+                advice or guaranteed outcomes. Consult your local Krishi Vigyan Kendra or agricultural university before
+                acting.</p>
+        </div>
+    </footer>
+    <div id="toasts" aria-live="polite"></div>
+    <script src="/static/js/chart.umd.js"></script>
+    <script src="/static/js/script.js"></script>
+</body>
+
+</html>
