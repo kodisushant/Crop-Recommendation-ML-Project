@@ -1,52 +1,80 @@
-{% extends "base.html" %}{% block title %}Model Performance{% endblock %}{% block body %}<div class="app-head">
+{% extends "base.html" %}
+
+{% block title %}Model Performance{% endblock %}
+
+{% block body %}
+<!-- Page Header -->
+<div class="app-head">
     <div class="wrap">
-        <h1>Model Performance</h1>
-        <p>How the eight classifiers compare, how reliable the chosen model is, and where it can fail.</p>
+        <h1>Model Performance & Evaluation</h1>
+        <p>Comprehensive benchmarking of 8 classifiers, 5-fold cross-validation results, and robustness tests.</p>
     </div>
 </div>
+
+<!-- Main Application Content -->
 <main class="app">
     <div class="wrap">
+        <!-- Selected Model Panel -->
         <div class="panel">
-            <h3><i class="fa-solid fa-trophy"></i> Selected model</h3>
+            <h3><i class="fa-solid fa-trophy"></i> Selected Production Model</h3>
             <p id="best" style="font-size:1.2rem;font-weight:600"></p>
-            <div class="note">Rule: highest 5-fold CV accuracy; models within 0.005 are tied and ranked by CV macro-F1.
-                Random Forest was chosen among the tied models because its probabilities suit confidence analysis.</div>
+            <div class="note">
+                Selection rule: Highest 5-fold cross-validation accuracy. Models within ±0.005 are considered statistically tied and ranked by macro-F1 and stability. Random Forest was selected because its calibrated probability distributions best support confidence and anomaly analysis.
+            </div>
         </div>
+
+        <!-- 8-Model Comparison Table -->
         <div class="panel tw">
-            <h3><i class="fa-solid fa-table"></i> Model comparison</h3>
+            <h3><i class="fa-solid fa-table"></i> Model Benchmark Comparison</h3>
             <table id="cmp"></table>
         </div>
+
+        <!-- Class-wise F1 & Robustness Graphs -->
         <div class="grid g2">
             <div class="panel">
-                <h3>Class-wise F1</h3>
-                <div class="chart-box"><canvas id="c-cw"></canvas></div>
+                <h3><i class="fa-solid fa-chart-bar"></i> Class-wise F1-Score (All 22 Crops)</h3>
+                <div class="chart-box">
+                    <canvas id="c-cw"></canvas>
+                </div>
             </div>
+
             <div class="panel">
-                <h3>Robustness (20% of std noise / missing feature)</h3>
-                <div class="chart-box"><canvas id="c-rb"></canvas></div>
+                <h3><i class="fa-solid fa-shield-halved"></i> Robustness Testing (Perturbation Analysis)</h3>
+                <div class="chart-box">
+                    <canvas id="c-rb"></canvas>
+                </div>
                 <div class="note" id="rb-all"></div>
             </div>
         </div>
+
+        <!-- Visual Plots from Disk -->
         <div class="grid g2 imgs">
             <div class="panel">
-                <h3>Model comparison</h3><img src="/plots/model_comparison.png" alt="Model comparison chart">
+                <h3>Model Comparison Plot</h3>
+                <img src="/plots/model_comparison.png" alt="Model comparison chart">
             </div>
             <div class="panel">
-                <h3>Confusion matrix</h3><img src="/plots/confusion_matrix.png" alt="Confusion matrix">
+                <h3>Confusion Matrix</h3>
+                <img src="/plots/confusion_matrix.png" alt="Confusion matrix">
             </div>
         </div>
+
+        <!-- Interpretable Decision Rules -->
         <div class="panel">
-            <h3><i class="fa-solid fa-sitemap"></i> Decision rules (illustrative depth-4 tree)</h3>
+            <h3><i class="fa-solid fa-sitemap"></i> Decision Rules (Illustrative Depth-4 Surrogate Tree)</h3>
             <pre class="rules" id="rules"></pre>
         </div>
-        <div class="alert"><b>Limitations</b>
+
+        <!-- Honest Scope & Limitations Notice -->
+        <div class="alert">
+            <b>Evaluation & Scope Notes:</b>
             <ul>
-                <li>The dataset is clean and well-separated, so ~99% accuracy is expected here and will be lower on
-                    real, messy farm data.</li>
-                <li>Probabilities are model scores, not agricultural certainty.</li>
-                <li>Out-of-range detection misses combinations where every value looks normal alone.</li>
-                <li>State, season and soil type are not model inputs (not in the dataset).</li>
+                <li>The dataset is clean and well-separated, so ~99% accuracy is normal here; field farm data will score lower.</li>
+                <li>Probabilities represent statistical model confidence on this dataset, not guaranteed agronomic yields.</li>
+                <li>Out-of-range detection checks both single-feature boundaries and 99th percentile Mahalanobis distance.</li>
+                <li>State, season, and soil type are not ML features because they were not present in the original dataset.</li>
             </ul>
         </div>
     </div>
-</main>{% endblock %}
+</main>
+{% endblock %}

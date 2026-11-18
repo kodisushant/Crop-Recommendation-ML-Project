@@ -1,30 +1,87 @@
-{% extends "base.html" %}{% block title %}Fertilizer Planning{% endblock %}{% block body %}<div class="app-head">
+{% extends "base.html" %}
+
+{% block title %}Fertilizer Planning{% endblock %}
+
+{% block body %}
+<!-- Page Header -->
+<div class="app-head">
     <div class="wrap">
         <h1>Fertilizer Planning</h1>
-        <p>Soil N, P, K are classed low, medium or high, the crop dose is adjusted, then converted to urea, DAP and MOP.
-        </p>
+        <p>Soil N, P, K are classed low, medium, or high, the crop dose is adjusted, then converted to urea, DAP, and MOP.</p>
     </div>
 </div>
+
+<!-- Main Application Content -->
 <main class="app">
     <div class="wrap">
         <div class="two">
+            <!-- Form Section -->
             <form id="form" novalidate>
+                <!-- Target Crop Selection -->
                 <div class="panel">
-                    <h3><i class="fa-solid fa-wheat-awn"></i> Crop</h3><label for="crop">Select crop</label><select
-                        id="crop" required></select>
+                    <h3><i class="fa-solid fa-wheat-awn"></i> Crop</h3>
+                    <label for="crop">Select crop</label>
+                    <select id="crop" required>
+                        <option value="">Select crop…</option>
+                    </select>
                 </div>
+
+                <!-- Soil Nutrient Test & Farm Area -->
                 <div class="panel">
                     <h3><i class="fa-solid fa-flask"></i> Soil test and area</h3>
-                    <div id="fields"></div><label for="area" style="margin-top:14px">Area (hectares)</label><input
-                        type="number" id="area" value="1" min="0.01" step="0.01" required>
-                </div><button class="btn" id="go" type="submit"><span class="spinner"></span><i
-                        class="fa-solid fa-clipboard-list"></i> Create plan</button>
+                    <div class="fg">
+                        <!-- Nitrogen -->
+                        <div>
+                            <label for="f-N">
+                                <i class="fa-solid fa-flask"></i> Nitrogen (N) <small>(dataset units)</small>
+                            </label>
+                            <input type="number" id="f-N" name="N" min="0" max="300" step="1" value="90" required>
+                            <div class="hint">Soil nitrogen content · 0–300</div>
+                            <div class="err" id="e-f-N"></div>
+                        </div>
+
+                        <!-- Phosphorus -->
+                        <div>
+                            <label for="f-P">
+                                <i class="fa-solid fa-flask"></i> Phosphorus (P) <small>(dataset units)</small>
+                            </label>
+                            <input type="number" id="f-P" name="P" min="0" max="300" step="1" value="42" required>
+                            <div class="hint">Soil phosphorus content · 0–300</div>
+                            <div class="err" id="e-f-P"></div>
+                        </div>
+
+                        <!-- Potassium -->
+                        <div>
+                            <label for="f-K">
+                                <i class="fa-solid fa-flask"></i> Potassium (K) <small>(dataset units)</small>
+                            </label>
+                            <input type="number" id="f-K" name="K" min="0" max="400" step="1" value="43" required>
+                            <div class="hint">Soil potassium content · 0–400</div>
+                            <div class="err" id="e-f-K"></div>
+                        </div>
+                    </div>
+
+                    <!-- Farm Area Input -->
+                    <label for="area" style="margin-top:14px">Area (hectares)</label>
+                    <input type="number" id="area" value="1" min="0.01" step="0.01" required>
+                </div>
+
+                <!-- Submit Button -->
+                <button class="btn" id="go" type="submit">
+                    <span class="spinner"></span>
+                    <i class="fa-solid fa-clipboard-list"></i> Create plan
+                </button>
             </form>
+
+            <!-- Results Section -->
             <div id="result">
                 <div class="panel">
-                    <div class="empty"><i class="fa-solid fa-seedling"></i>Your results will appear here.</div>
+                    <div class="empty">
+                        <i class="fa-solid fa-seedling"></i>Your results will appear here.
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</main>{% endblock %}
+</main>
+{% endblock %}

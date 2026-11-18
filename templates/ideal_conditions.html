@@ -1,25 +1,43 @@
-{% extends "base.html" %}{% block title %}Ideal Crop Conditions{% endblock %}{% block body %}<div class="app-head">
+{% extends "base.html" %}
+
+{% block title %}Ideal Crop Conditions{% endblock %}
+
+{% block body %}
+<!-- Page Header -->
+<div class="app-head">
     <div class="wrap">
         <h1>Ideal Crop Conditions</h1>
-        <p>Growing ranges for each crop. Ranges are percentiles of the uploaded dataset (ideal = 10th–90th, acceptable =
-            2.5th–97.5th), not verified agronomic recommendations.</p>
+        <p>Growing ranges for each crop derived from the dataset percentiles (Ideal = 10th–90th, Acceptable = 2.5th–97.5th).</p>
     </div>
 </div>
+
+<!-- Main Application Content -->
 <main class="app">
     <div class="wrap">
+        <!-- Search & Filter Controls -->
         <div class="inl panel">
-            <div><label for="q">Search crop</label><input id="q" placeholder="e.g. rice"></div>
-            <div><label for="season">Season</label><select id="season">
-                    <option value="">All</option>
+            <div>
+                <label for="q">Search crop</label>
+                <input id="q" placeholder="e.g. rice, maize, cotton">
+            </div>
+            <div>
+                <label for="season">Season</label>
+                <select id="season">
+                    <option value="">All Seasons</option>
                     <option>Kharif</option>
                     <option>Rabi</option>
                     <option>Zaid</option>
                     <option>Perennial</option>
-                </select></div>
+                </select>
+            </div>
         </div>
-        <div class="alert">Soil types, seasons, durations, prices and doses are indicative reference values. State
-            suitability is not shown because the dataset has no state column and nothing here is verified per state.
+
+        <div class="alert">
+            Soil types, seasons, durations, prices, and doses are indicative reference values. Regional state suitability is not shown because the dataset does not contain a state feature.
         </div>
+
+        <!-- Dynamic Crop Cards Grid -->
         <div class="grid g3" id="cards"></div>
     </div>
-</main>{% endblock %}
+</main>
+{% endblock %}

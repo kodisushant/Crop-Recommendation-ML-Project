@@ -1,111 +1,165 @@
-{% extends "base.html" %}{% block title %}Grow Smarter. Harvest Better.{% endblock %}
-{% block links %}<li><a href="/">Home</a></li>
+{% extends "base.html" %}
+
+{% block title %}Grow Smarter. Harvest Better.{% endblock %}
+
+{% block links %}
+<li><a href="/">Home</a></li>
 <li><a href="#features">Features</a></li>
 <li><a href="#how">How It Works</a></li>
 <li><a href="#about">About</a></li>
-<li><a href="/dashboard">Dashboard</a></li>{% endblock %}
-{% block body %}<section class="hero">
+<li><a href="/dashboard">Dashboard</a></li>
+{% endblock %}
+
+{% block body %}
+<!-- Hero Section -->
+<section class="hero">
     <div class="wrap">
         <h1>Grow Smarter. Harvest Better.</h1>
-        <p>Make informed farming decisions with AI-powered crop recommendations, soil insights and agricultural planning
-            tools.</p>
-        <div class="btns"><a class="btn light" href="/recommendation">Get Started</a><a class="btn outline-w"
-                href="#features">Explore Features</a></div>
+        <p>Make informed farming decisions with AI-powered crop recommendations, soil insights, and agricultural planning tools.</p>
+        
+        <div class="btns">
+            <a class="btn light" href="/recommendation">Get Started</a>
+            <a class="btn outline-w" href="#features">Explore Features</a>
+        </div>
+        
+        <!-- Key Statistics -->
         <div class="hero-stats">
-            <div><b id="h-crops">22</b><span>crops supported</span></div>
-            <div><b id="h-acc">–</b><span>test accuracy</span></div>
-            <div><b id="h-model">–</b><span>production model</span></div>
+            <div>
+                <b id="h-crops">22</b>
+                <span>crops supported</span>
+            </div>
+            <div>
+                <b id="h-acc">–</b>
+                <span>test accuracy</span>
+            </div>
+            <div>
+                <b id="h-model">–</b>
+                <span>production model</span>
+            </div>
         </div>
     </div>
 </section>
+
+<!-- Features Grid Section -->
 <section id="features" class="alt">
     <div class="wrap">
         <div class="sec-head">
             <h2>Everything you need before you sow</h2>
-            <p>One platform for the decisions that come after the soil test.</p>
+            <p>One unified platform for the decisions that come after the soil test.</p>
         </div>
-        <div class="grid g4"><a class="card" href="/recommendation">
+        
+        <div class="grid g4">
+            <!-- Feature 1: Crop Recommendation -->
+            <a class="card" href="/recommendation">
                 <div class="ico"><i class="fa-solid fa-seedling"></i></div>
                 <h3>AI Crop Recommendation</h3>
-                <p>Top-3 crops from a model trained on 2,200 soil and climate records.</p>
-            </a><a class="card" href="/recommendation">
+                <p>Top-3 crops predicted from a model trained on 2,200 soil and climate records.</p>
+            </a>
+
+            <!-- Feature 2: Soil Analysis -->
+            <a class="card" href="/recommendation">
                 <div class="ico"><i class="fa-solid fa-vial"></i></div>
                 <h3>Soil Analysis</h3>
-                <p>See which nutrients and pH levels drive the recommendation.</p>
-            </a><a class="card" href="/land-check">
+                <p>See which nutrients, pH levels, and rainfall drivers influence the prediction.</p>
+            </a>
+
+            <!-- Feature 3: Land Suitability -->
+            <a class="card" href="/land-check">
                 <div class="ico"><i class="fa-solid fa-map"></i></div>
                 <h3>Land Suitability</h3>
-                <p>Check your land against a crop's ideal and acceptable ranges.</p>
-            </a><a class="card" href="/fertilizer">
+                <p>Check your land against a crop's ideal and acceptable agronomic ranges.</p>
+            </a>
+
+            <!-- Feature 4: Fertilizer Planning -->
+            <a class="card" href="/fertilizer">
                 <div class="ico"><i class="fa-solid fa-flask"></i></div>
                 <h3>Fertilizer Planning</h3>
-                <p>Urea, DAP and MOP quantities, cost and an application schedule.</p>
-            </a><a class="card" href="/market">
+                <p>Calculates Urea, DAP, and MOP quantities, cost, and an application schedule.</p>
+            </a>
+
+            <!-- Feature 5: Market Prices -->
+            <a class="card" href="/market">
                 <div class="ico"><i class="fa-solid fa-chart-line"></i></div>
                 <h3>Market Prices</h3>
-                <p>Live mandi prices from data.gov.in, with clear reference fallbacks.</p>
-            </a><a class="card" href="/profit">
+                <p>Live mandi prices from Agmarknet (data.gov.in) with reference fallbacks.</p>
+            </a>
+
+            <!-- Feature 6: Profit Estimation -->
+            <a class="card" href="/profit">
                 <div class="ico"><i class="fa-solid fa-indian-rupee-sign"></i></div>
                 <h3>Profit Estimation</h3>
-                <p>Low, typical and high scenarios with break-even yield and price.</p>
-            </a><a class="card" href="/rotation">
+                <p>Low, typical, and high yield scenarios with break-even price and volume.</p>
+            </a>
+
+            <!-- Feature 7: Crop Rotation -->
+            <a class="card" href="/rotation">
                 <div class="ico"><i class="fa-solid fa-rotate"></i></div>
                 <h3>Crop Rotation</h3>
-                <p>Next-season suggestions with the reasoning shown.</p>
-            </a><a class="card" href="/what-if">
+                <p>Scientific next-season recommendations with agronomic reasoning.</p>
+            </a>
+
+            <!-- Feature 8: What-If Analysis -->
+            <a class="card" href="/what-if">
                 <div class="ico"><i class="fa-solid fa-sliders"></i></div>
                 <h3>What-If Analysis</h3>
-                <p>Change an input and watch the recommendation move.</p>
-            </a></div>
+                <p>Simulate weather changes and discover tipping points where crops switch.</p>
+            </a>
+        </div>
     </div>
 </section>
+
+<!-- How It Works Section -->
 <section id="how">
     <div class="wrap">
         <div class="sec-head">
-            <h2>How it works</h2>
+            <h2>How It Works</h2>
         </div>
+        
         <div class="grid g3 steps">
             <div class="step">
-                <h3>Enter soil and weather</h3>
-                <p>Nitrogen, phosphorus, potassium, pH, temperature, humidity and rainfall.</p>
+                <h3>Enter Soil and Weather</h3>
+                <p>Nitrogen, phosphorus, potassium, pH, temperature, humidity, and rainfall.</p>
             </div>
             <div class="step">
-                <h3>The model analyses it</h3>
-                <p>A trained classifier scores 22 crops and checks if your input looks unusual.</p>
+                <h3>The Model Analyses It</h3>
+                <p>A trained Random Forest classifier scores 22 crops and checks for anomalies.</p>
             </div>
             <div class="step">
-                <h3>Get recommendations</h3>
-                <p>See top crops, confidence, fertilizer, profit and rotation plans.</p>
+                <h3>Get Actionable Plans</h3>
+                <p>See top crops, confidence scores, fertilizer, profit, and rotation plans.</p>
             </div>
         </div>
     </div>
 </section>
+
+<!-- Why Choose Us Section -->
 <section class="dark">
     <div class="wrap why">
         <div>
-            <h2>Why choose Crop Advisor?</h2>
-            <p>It tells you when it is unsure, and refuses to guess when your input is outside what it has seen.</p>
+            <h2>Why Choose Crop Advisor?</h2>
+            <p>It transparently informs you when confidence is low, and refuses to guess when inputs fall outside historical boundaries.</p>
         </div>
+        
         <ul class="checks">
-            <li><i class="fa-solid fa-check"></i>ML-powered recommendations, 8 models compared with cross-validation
-            </li>
-            <li><i class="fa-solid fa-check"></i>Top-3 crop comparison with probabilities</li>
-            <li><i class="fa-solid fa-check"></i>Prediction confidence and stability checks</li>
-            <li><i class="fa-solid fa-check"></i>Out-of-range detection that withholds unreliable answers</li>
-            <li><i class="fa-solid fa-check"></i>Planning tools for fertilizer, profit and rotation</li>
+            <li><i class="fa-solid fa-check"></i> ML-powered recommendations, 8 algorithms compared via 5-fold CV</li>
+            <li><i class="fa-solid fa-check"></i> Top-3 crop probabilistic ranking with entropy measurement</li>
+            <li><i class="fa-solid fa-check"></i> Noise-injection stability testing on every prediction</li>
+            <li><i class="fa-solid fa-check"></i> Mahalanobis distance out-of-range anomaly detection</li>
+            <li><i class="fa-solid fa-check"></i> Integrated planning for fertilizers, profit, and seasonal rotation</li>
         </ul>
     </div>
 </section>
+
+<!-- About Section -->
 <section id="about">
     <div class="wrap two">
         <div>
             <h2>About Crop Advisor</h2>
-            <p>Crop Advisor is an academic project that turns the open Crop Recommendation dataset into a practical
-                decision-support website for farmers, extension officers and students.</p>
+            <p>Crop Advisor is an applied machine learning project that converts research datasets into a practical decision-support system for farmers, agricultural officers, and researchers.</p>
         </div>
         <div class="card">
-            <p>Model predictions use only soil nutrients, pH and weather. State is used for market prices. Reference
-                prices, doses and durations are indicative and must be confirmed locally.</p>
+            <p>Model predictions use strictly soil nutrients, pH, and weather. Location (State) is used for mandi market prices only. Doses, prices, and yields are indicative and should be confirmed with your local KVK or agricultural university.</p>
         </div>
     </div>
-</section>{% endblock %}
+</section>
+{% endblock %}

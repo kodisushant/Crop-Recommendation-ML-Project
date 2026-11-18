@@ -1,73 +1,120 @@
-{% extends "base.html" %}{% block title %}Dashboard{% endblock %}{% block body %}<div class="app-head">
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block body %}
+<!-- Page Header -->
+<div class="app-head">
     <div class="wrap">
         <h1>Dashboard</h1>
-        <p>Your overview of the model, quick tools and recent predictions.</p>
+        <p>Your overview of model performance metrics, quick tools, and recent local predictions.</p>
     </div>
 </div>
+
+<!-- Main Application Content -->
 <main class="app">
     <div class="wrap">
+        <!-- Metric Statistics Cards -->
         <div class="grid g4">
             <div class="card stat">
                 <div class="ico"><i class="fa-solid fa-wheat-awn"></i></div>
-                <div><b id="d-crops">–</b><span>Supported crops</span></div>
+                <div>
+                    <b id="d-crops">–</b>
+                    <span>Supported crops</span>
+                </div>
             </div>
             <div class="card stat">
                 <div class="ico"><i class="fa-solid fa-brain"></i></div>
-                <div><b id="d-model">–</b><span>Best model</span></div>
+                <div>
+                    <b id="d-model">–</b>
+                    <span>Best production model</span>
+                </div>
             </div>
             <div class="card stat">
                 <div class="ico"><i class="fa-solid fa-bullseye"></i></div>
-                <div><b id="d-acc">–</b><span>Test accuracy</span></div>
+                <div>
+                    <b id="d-acc">–</b>
+                    <span>Test accuracy</span>
+                </div>
             </div>
             <div class="card stat">
                 <div class="ico"><i class="fa-solid fa-database"></i></div>
-                <div><b id="d-rows">–</b><span>Training records</span></div>
+                <div>
+                    <b id="d-rows">–</b>
+                    <span>Training records</span>
+                </div>
             </div>
         </div>
-        <h2 style="margin-top:36px">Quick tools</h2>
-        <div class="grid g4"><a class="card" href="/recommendation">
+
+        <!-- Quick Access Tools Section -->
+        <h2 style="margin-top:36px">Quick Tools</h2>
+        <div class="grid g4">
+            <a class="card" href="/recommendation">
                 <div class="ico"><i class="fa-solid fa-seedling"></i></div>
                 <h3>Recommend a Crop</h3>
-            </a><a class="card" href="/land-check">
+            </a>
+            <a class="card" href="/land-check">
                 <div class="ico"><i class="fa-solid fa-map"></i></div>
                 <h3>Land Suitability</h3>
-            </a><a class="card" href="/fertilizer">
+            </a>
+            <a class="card" href="/fertilizer">
                 <div class="ico"><i class="fa-solid fa-flask"></i></div>
                 <h3>Fertilizer Planning</h3>
-            </a><a class="card" href="/market">
+            </a>
+            <a class="card" href="/market">
                 <div class="ico"><i class="fa-solid fa-chart-line"></i></div>
                 <h3>Market Prices</h3>
-            </a><a class="card" href="/profit">
+            </a>
+            <a class="card" href="/profit">
                 <div class="ico"><i class="fa-solid fa-indian-rupee-sign"></i></div>
                 <h3>Profit Estimation</h3>
-            </a><a class="card" href="/what-if">
+            </a>
+            <a class="card" href="/what-if">
                 <div class="ico"><i class="fa-solid fa-sliders"></i></div>
                 <h3>What-If Analysis</h3>
-            </a><a class="card" href="/rotation">
+            </a>
+            <a class="card" href="/rotation">
                 <div class="ico"><i class="fa-solid fa-rotate"></i></div>
                 <h3>Crop Rotation</h3>
-            </a></div>
+            </a>
+            <a class="card" href="/model-performance">
+                <div class="ico"><i class="fa-solid fa-gauge-high"></i></div>
+                <h3>Model Analytics</h3>
+            </a>
+        </div>
+
+        <!-- Charts & History Grid -->
         <div class="grid g2" style="margin-top:30px">
+            <!-- Model Accuracy Comparison Chart -->
             <div class="panel">
-                <h3><i class="fa-solid fa-chart-column"></i> Model comparison</h3>
-                <div class="chart-box"><canvas id="c-models"></canvas></div>
+                <h3><i class="fa-solid fa-chart-column"></i> Model Comparison (CV vs Test)</h3>
+                <div class="chart-box">
+                    <canvas id="c-models"></canvas>
+                </div>
             </div>
+
+            <!-- Recent Predictions Table -->
             <div>
                 <div class="panel tw">
-                    <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent predictions (this browser)</h3>
+                    <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Predictions (This Browser)</h3>
                     <table>
                         <tbody id="hist"></tbody>
-                    </table><button class="btn ghost sm" id="clear-hist" style="margin-top:10px">Clear history</button>
+                    </table>
+                    <button class="btn ghost sm" id="clear-hist" style="margin-top:10px">
+                        Clear History
+                    </button>
                 </div>
+
                 <div class="panel">
-                    <h3><i class="fa-solid fa-circle-info"></i> Good to know</h3>
+                    <h3><i class="fa-solid fa-circle-info"></i> Good to Know</h3>
                     <ul>
-                        <li>Use soil-test values from your Soil Health Card where possible.</li>
-                        <li>If you see OUT_OF_RANGE, re-check units before trusting any crop.</li>
-                        <li>Treat LOW_CONFIDENCE results as a shortlist, not an answer.</li>
+                        <li>Use soil-test values from your official Soil Health Card where available.</li>
+                        <li>If you see OUT_OF_RANGE, re-check units before trusting any recommendation.</li>
+                        <li>Treat LOW_CONFIDENCE results as a shortlist rather than a definitive answer.</li>
                     </ul>
                 </div>
             </div>
         </div>
     </div>
-</main>{% endblock %}
+</main>
+{% endblock %}

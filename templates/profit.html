@@ -1,41 +1,77 @@
-{% extends "base.html" %}{% block title %}Profit Estimation{% endblock %}{% block body %}<div class="app-head">
+{% extends "base.html" %}
+
+{% block title %}Profit Estimation{% endblock %}
+
+{% block body %}
+<!-- Page Header -->
+<div class="app-head">
     <div class="wrap">
         <h1>Profit Estimation</h1>
-        <p>Revenue = yield × price. Profit = revenue − cost. Change any assumption; leave blank to use reference values.
-        </p>
+        <p>Revenue = Yield × Price. Net Profit = Revenue − Total Cost. Customize any assumption or leave blank to use reference baselines.</p>
     </div>
 </div>
+
+<!-- Main Application Content -->
 <main class="app">
     <div class="wrap">
         <div class="two">
+            <!-- Form Section -->
             <form id="form" novalidate>
+                <!-- Crop Selection -->
                 <div class="panel">
-                    <h3><i class="fa-solid fa-wheat-awn"></i> Crop</h3><label for="crop">Select crop</label><select
-                        id="crop" required></select>
+                    <h3><i class="fa-solid fa-wheat-awn"></i> Crop</h3>
+                    <label for="crop">Select crop</label>
+                    <select id="crop" required></select>
                 </div>
+
+                <!-- Financial & Agronomic Assumptions -->
                 <div class="panel">
                     <h3><i class="fa-solid fa-sliders"></i> Assumptions</h3>
                     <div class="fg">
-                        <div><label for="area">Area (ha)</label><input type="number" id="area" value="1" min="0.01"
-                                step="0.01"></div>
-                        <div><label for="state">State (for live price)</label><select id="state"></select></div>
-                        <div><label for="yld">Yield (q/ha)</label><input type="number" id="yld" step="any" min="0">
+                        <div>
+                            <label for="area">Area (ha)</label>
+                            <input type="number" id="area" value="1" min="0.01" step="0.01" required>
                         </div>
-                        <div><label for="price">Price (₹/q)</label><input type="number" id="price" step="any" min="0">
+                        <div>
+                            <label for="state">State (for live price)</label>
+                            <select id="state"></select>
                         </div>
-                        <div><label for="cost">Cost (₹/ha)</label><input type="number" id="cost" step="any" min="0">
+                        <div>
+                            <label for="yld">Yield (q/ha)</label>
+                            <input type="number" id="yld" step="any" min="0">
                         </div>
-                        <div><label for="dur">Duration (days)</label><input type="number" id="dur" min="1"></div>
+                        <div>
+                            <label for="price">Price (₹/q)</label>
+                            <input type="number" id="price" step="any" min="0">
+                        </div>
+                        <div>
+                            <label for="cost">Cost (₹/ha)</label>
+                            <input type="number" id="cost" step="any" min="0">
+                        </div>
+                        <div>
+                            <label for="dur">Duration (days)</label>
+                            <input type="number" id="dur" min="1">
+                        </div>
                     </div>
-                    <div class="hint">Greyed numbers show the reference value used if you leave a box empty.</div>
-                </div><button class="btn" id="go" type="submit"><span class="spinner"></span><i
-                        class="fa-solid fa-calculator"></i> Estimate profit</button>
+                    <div class="hint">Grey placeholder numbers show the default reference values used if left blank.</div>
+                </div>
+
+                <!-- Submit Button -->
+                <button class="btn" id="go" type="submit">
+                    <span class="spinner"></span>
+                    <i class="fa-solid fa-calculator"></i> Estimate Profit
+                </button>
             </form>
+
+            <!-- Results Section -->
             <div id="result">
                 <div class="panel">
-                    <div class="empty"><i class="fa-solid fa-seedling"></i>Your results will appear here.</div>
+                    <div class="empty">
+                        <i class="fa-solid fa-seedling"></i>Your results will appear here.
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</main>{% endblock %}
+</main>
+{% endblock %}
