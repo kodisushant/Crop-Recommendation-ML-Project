@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}7-Day Weather Forecast{% endblock %}
+
+{% block body %}
+<!-- Page Header -->
+<div class="app-head">
+    <div class="wrap">
+        <h1>7-Day Weather Forecast</h1>
+        <p>Check the upcoming 7-day temperature and rainfall forecast for any city or town using live Open-Meteo weather
+            data.</p>
+        <p>Check the upcoming 7-day temperature, humidity, and rainfall forecast for any city, district, or state using
+            live Open-Meteo weather data.</p>
+    </div>
+</div>
+
+<!-- Main Application Content -->
+<main class="app">
+    <div class="wrap">
+        <!-- City / District / State Search Form -->
+        <form id="form" class="panel inl" novalidate>
+            <div class="city-ac">
+                <label for="city">City, District, or State</label>
+                <input type="text" id="city" name="city" value="Hyderabad" autocomplete="off" placeholder="e.g. Hyderabad, Telangana, East Godavari" required>
+                <ul id="city-suggestions" class="ac-list" role="listbox" hidden></ul>
+            </div>
+
+                <button class="btn" id="go" type="submit">
+                    <span class="spinner"></span>
+                    <i class="fa-solid fa-cloud-sun-rain"></i> Get Forecast
+                </button>
+        </form>
+
+        <!-- Forecast Results Container -->
+        <div id="result">
+            <div class="panel">
+                <div class="empty">
+                    <i class="fa-solid fa-cloud-sun"></i>Enter a city, district, or state and click Get Forecast to see the 7-day weather outlook.
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}

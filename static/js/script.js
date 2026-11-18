@@ -15,89 +15,89 @@
  * Matches the dataset features expected by the trained Scikit-Learn models.
  */
 const FIELD_DEFINITIONS = {
-    N: {
-        label: "Nitrogen (N)",
-        unit: "dataset units",
-        min: 0,
-        max: 300,
-        defaultValue: 90,
-        icon: "fa-flask",
-        description: "Soil nitrogen content",
-        group: "Soil Nutrients",
-        step: 1
-    },
-    P: {
-        label: "Phosphorus (P)",
-        unit: "dataset units",
-        min: 0,
-        max: 300,
-        defaultValue: 42,
-        icon: "fa-flask",
-        description: "Soil phosphorus content",
-        group: "Soil Nutrients",
-        step: 1
-    },
-    K: {
-        label: "Potassium (K)",
-        unit: "dataset units",
-        min: 0,
-        max: 400,
-        defaultValue: 43,
-        icon: "fa-flask",
-        description: "Soil potassium content",
-        group: "Soil Nutrients",
-        step: 1
-    },
-    ph: {
-        label: "Soil pH",
-        unit: "0–14",
-        min: 0,
-        max: 14,
-        defaultValue: 6.5,
-        icon: "fa-droplet",
-        description: "Acidity (7 = neutral)",
-        group: "Soil Properties",
-        step: 0.1
-    },
-    temperature: {
-        label: "Temperature",
-        unit: "°C",
-        min: -5,
-        max: 55,
-        defaultValue: 20.9,
-        icon: "fa-temperature-half",
-        description: "Average temperature",
-        group: "Weather Conditions",
-        step: 0.1
-    },
-    humidity: {
-        label: "Humidity",
-        unit: "%",
-        min: 0,
-        max: 100,
-        defaultValue: 82,
-        icon: "fa-cloud",
-        description: "Relative humidity",
-        group: "Weather Conditions",
-        step: 0.1
-    },
-    rainfall: {
-        label: "Rainfall",
-        unit: "mm",
-        min: 0,
-        max: 1000,
-        defaultValue: 203,
-        icon: "fa-cloud-rain",
-        description: "Rainfall",
-        group: "Weather Conditions",
-        step: 0.1
-    }
+  N: {
+    label: "Nitrogen (N)",
+    unit: "dataset units",
+    min: 0,
+    max: 300,
+    defaultValue: 90,
+    icon: "fa-flask",
+    description: "Soil nitrogen content",
+    group: "Soil Nutrients",
+    step: 1
+  },
+  P: {
+    label: "Phosphorus (P)",
+    unit: "dataset units",
+    min: 0,
+    max: 300,
+    defaultValue: 42,
+    icon: "fa-flask",
+    description: "Soil phosphorus content",
+    group: "Soil Nutrients",
+    step: 1
+  },
+  K: {
+    label: "Potassium (K)",
+    unit: "dataset units",
+    min: 0,
+    max: 400,
+    defaultValue: 43,
+    icon: "fa-flask",
+    description: "Soil potassium content",
+    group: "Soil Nutrients",
+    step: 1
+  },
+  ph: {
+    label: "Soil pH",
+    unit: "0–14",
+    min: 0,
+    max: 14,
+    defaultValue: 6.5,
+    icon: "fa-droplet",
+    description: "Acidity (7 = neutral)",
+    group: "Soil Properties",
+    step: 0.1
+  },
+  temperature: {
+    label: "Temperature",
+    unit: "°C",
+    min: -5,
+    max: 55,
+    defaultValue: 20.9,
+    icon: "fa-temperature-half",
+    description: "Average temperature",
+    group: "Weather Conditions",
+    step: 0.1
+  },
+  humidity: {
+    label: "Humidity",
+    unit: "%",
+    min: 0,
+    max: 100,
+    defaultValue: 82,
+    icon: "fa-cloud",
+    description: "Relative humidity",
+    group: "Weather Conditions",
+    step: 0.1
+  },
+  rainfall: {
+    label: "Rainfall",
+    unit: "mm",
+    min: 0,
+    max: 1000,
+    defaultValue: 203,
+    icon: "fa-cloud-rain",
+    description: "Rainfall",
+    group: "Weather Conditions",
+    step: 0.1
+  }
 };
 
 /** Palette for charts and graphical elements */
 const CHART_COLORS = [
-    "#174D32", "#4C956C", "#9BC53D", "#DCECCB",
-    "#B7791F", "#5B8E7D", "#8A9A5B", "#C9A227"
+  "#174D32", "#4C956C", "#9BC53D", "#DCECCB",
+  "#B7791F", "#5B8E7D", "#8A9A5B", "#C9A227"
 ];
 
 /** Active Chart.js instances registry to allow clean updates and avoid memory leaks */
@@ -113,24 +113,24 @@ let cachedCropsList = null;
 
 /** Shortcut to select a single DOM element */
 function getElement(selector, root = document) {
-    return root.querySelector(selector);
+  return root.querySelector(selector);
 }
 
 /** Shortcut to select multiple DOM elements as an Array */
 function getAllElements(selector, root = document) {
-    return Array.from(root.querySelectorAll(selector));
+  return Array.from(root.querySelectorAll(selector));
 }
 
 /** Capitalizes the first letter of a string (e.g. 'rice' -> 'Rice') */
 function capitalizeFirstLetter(str) {
-    if (!str) return "";
-    return str.charAt(0).toUpperCase() + str.slice(1);
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 /** Formats a numeric value into Indian Rupee currency string (e.g. ₹2,369) */
 function formatRupees(amount) {
-    if (isNaN(amount) || amount === null) return "₹0";
-    return "₹" + Math.round(amount).toLocaleString("en-IN");
+  if (isNaN(amount) || amount === null) return "₹0";
+  return "₹" + Math.round(amount).toLocaleString("en-IN");
 }
 
 /**
@@ -139,19 +139,19 @@ function formatRupees(amount) {
  * @param {string} type - 'ok' or 'error'
  */
 function showToast(message, type = "ok") {
-    const toastContainer = getElement("#toasts");
-    if (!toastContainer) return;
+  const toastContainer = getElement("#toasts");
+  if (!toastContainer) return;
 
-    const toastElement = document.createElement("div");
-    toastElement.className = "toast " + (type === "error" ? "error" : "");
-    toastElement.setAttribute("role", "status");
-    toastElement.textContent = message;
+  const toastElement = document.createElement("div");
+  toastElement.className = "toast " + (type === "error" ? "error" : "");
+  toastElement.setAttribute("role", "status");
+  toastElement.textContent = message;
 
-    toastContainer.appendChild(toastElement);
+  toastContainer.appendChild(toastElement);
 
-    setTimeout(() => {
-        toastElement.remove();
-    }, 4200);
+  setTimeout(() => {
+    toastElement.remove();
+  }, 4200);
 }
 
 /**
@@ -161,33 +161,33 @@ function showToast(message, type = "ok") {
  * @returns {Promise<object>} Parsed JSON response
  */
 async function fetchApi(url, requestBody = null) {
-    let response;
-    try {
-        const fetchOptions = requestBody ? {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestBody)
-        } : undefined;
+  let response;
+  try {
+    const fetchOptions = requestBody ? {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody)
+    } : undefined;
 
-        response = await fetch(url, fetchOptions);
-    } catch (networkError) {
-        throw new Error("Cannot reach the server. Please check your network connection.");
+    response = await fetch(url, fetchOptions);
+  } catch (networkError) {
+    throw new Error("Cannot reach the server. Please check your network connection.");
+  }
+
+  const jsonResponse = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    let errorMessage = jsonResponse.detail;
+    if (Array.isArray(errorMessage)) {
+      // Unpack Pydantic field validation error messages
+      errorMessage = errorMessage
+        .map(err => `${(err.loc || []).slice(-1)[0]}: ${err.msg}`)
+        .join("; ");
     }
+    throw new Error(errorMessage || `Request failed with status ${response.status}`);
+  }
 
-    const jsonResponse = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        let errorMessage = jsonResponse.detail;
-        if (Array.isArray(errorMessage)) {
-            // Unpack Pydantic field validation error messages
-            errorMessage = errorMessage
-                .map(err => `${(err.loc || []).slice(-1)[0]}: ${err.msg}`)
-                .join("; ");
-        }
-        throw new Error(errorMessage || `Request failed with status ${response.status}`);
-    }
-
-    return jsonResponse;
+  return jsonResponse;
 }
 
 /**
@@ -196,21 +196,21 @@ async function fetchApi(url, requestBody = null) {
  * @param {object} chartConfig - Chart.js configuration object
  */
 function renderChart(canvasId, chartConfig) {
-    const canvasElement = document.getElementById(canvasId);
-    if (!canvasElement) return;
+  const canvasElement = document.getElementById(canvasId);
+  if (!canvasElement) return;
 
-    // Destroy existing instance to prevent overlapping canvases
-    if (activeChartInstances[canvasId]) {
-        activeChartInstances[canvasId].destroy();
-    }
+  // Destroy existing instance to prevent overlapping canvases
+  if (activeChartInstances[canvasId]) {
+    activeChartInstances[canvasId].destroy();
+  }
 
-    // Ensure responsive layout
-    chartConfig.options = Object.assign(
-        { responsive: true, maintainAspectRatio: false },
-        chartConfig.options || {}
-    );
+  // Ensure responsive layout
+  chartConfig.options = Object.assign(
+    { responsive: true, maintainAspectRatio: false },
+    chartConfig.options || {}
+  );
 
-    activeChartInstances[canvasId] = new Chart(canvasElement, chartConfig);
+  activeChartInstances[canvasId] = new Chart(canvasElement, chartConfig);
 }
 
 /**
@@ -219,30 +219,30 @@ function renderChart(canvasId, chartConfig) {
  * @param {Function} asyncAction - Async function to run
  */
 async function executeWithLoadingState(submitButton, asyncAction) {
-    if (!submitButton) {
-        await asyncAction();
-        return;
-    }
+  if (!submitButton) {
+    await asyncAction();
+    return;
+  }
 
-    submitButton.classList.add("loading");
-    submitButton.disabled = true;
+  submitButton.classList.add("loading");
+  submitButton.disabled = true;
 
-    try {
-        await asyncAction();
-    } catch (error) {
-        showToast(error.message, "error");
-        const resultContainer = getElement("#result");
-        if (resultContainer) {
-            resultContainer.innerHTML = `
+  try {
+    await asyncAction();
+  } catch (error) {
+    showToast(error.message, "error");
+    const resultContainer = getElement("#result");
+    if (resultContainer) {
+      resultContainer.innerHTML = `
                 <div class="alert bad">
                     <b>Something went wrong:</b> ${error.message}
                 </div>
             `;
-        }
-    } finally {
-        submitButton.classList.remove("loading");
-        submitButton.disabled = false;
     }
+  } finally {
+    submitButton.classList.remove("loading");
+    submitButton.disabled = false;
+  }
 }
 
 /**
@@ -251,39 +251,39 @@ async function executeWithLoadingState(submitButton, asyncAction) {
  * @param {string} text - Display text
  */
 function renderBadge(status, text = null) {
-    const normalizedStatus = String(status).toLowerCase();
-    const displayText = text || String(status).replace("_", " ");
-    return `<span class="badge b-${normalizedStatus}">${displayText}</span>`;
+  const normalizedStatus = String(status).toLowerCase();
+  const displayText = text || String(status).replace("_", " ");
+  return `<span class="badge b-${normalizedStatus}">${displayText}</span>`;
 }
 
 /**
  * Returns an empty placeholder view with an icon
  */
 function renderEmptyPlaceholder(iconClass, messageText) {
-    return `<div class="empty"><i class="fa-solid ${iconClass}"></i>${messageText}</div>`;
+  return `<div class="empty"><i class="fa-solid ${iconClass}"></i>${messageText}</div>`;
 }
 
 /**
  * Retrieves the last-used input values saved in browser localStorage
  */
 function getLastSavedFormValues() {
-    try {
-        return JSON.parse(localStorage.getItem("ca_last")) || {};
-    } catch {
-        return {};
-    }
+  try {
+    return JSON.parse(localStorage.getItem("ca_last")) || {};
+  } catch {
+    return {};
+  }
 }
 
 /**
  * Persists the latest user input values into browser localStorage
  */
 function saveFormValues(values) {
-    try {
-        const mergedValues = { ...getLastSavedFormValues(), ...values };
-        localStorage.setItem("ca_last", JSON.stringify(mergedValues));
-    } catch (e) {
-        console.warn("Could not save to localStorage", e);
-    }
+  try {
+    const mergedValues = { ...getLastSavedFormValues(), ...values };
+    localStorage.setItem("ca_last", JSON.stringify(mergedValues));
+  } catch (e) {
+    console.warn("Could not save to localStorage", e);
+  }
 }
 
 
@@ -295,10 +295,10 @@ function saveFormValues(values) {
  * Fetches and caches the list of crops from the backend (/crops)
  */
 async function getCropsList() {
-    if (!cachedCropsList) {
-        cachedCropsList = await fetchApi("/crops");
-    }
-    return cachedCropsList;
+  if (!cachedCropsList) {
+    cachedCropsList = await fetchApi("/crops");
+  }
+  return cachedCropsList;
 }
 
 /**
@@ -307,14 +307,14 @@ async function getCropsList() {
  * @param {boolean} includeBlankOption - Whether to prefix with "Select crop..."
  */
 async function populateCropDropdown(selectElement, includeBlankOption = false) {
-    if (!selectElement) return;
-    const crops = await getCropsList();
+  if (!selectElement) return;
+  const crops = await getCropsList();
 
-    const optionsHtml = crops.map(item => {
-        return `<option value="${item.crop}">${capitalizeFirstLetter(item.crop)}</option>`;
-    }).join("");
+  const optionsHtml = crops.map(item => {
+    return `<option value="${item.crop}">${capitalizeFirstLetter(item.crop)}</option>`;
+  }).join("");
 
-    selectElement.innerHTML = (includeBlankOption ? `<option value="">Select crop…</option>` : "") + optionsHtml;
+  selectElement.innerHTML = (includeBlankOption ? `<option value="">Select crop…</option>` : "") + optionsHtml;
 }
 
 /**
@@ -322,18 +322,18 @@ async function populateCropDropdown(selectElement, includeBlankOption = false) {
  * @param {HTMLSelectElement} selectElement - Target dropdown element
  */
 async function populateStateDropdown(selectElement) {
-    if (!selectElement) return;
-    let statesList = [];
+  if (!selectElement) return;
+  let statesList = [];
 
-    try {
-        const response = await fetchApi("/states");
-        statesList = response.states || [];
-    } catch (error) {
-        showToast("Could not load states list", "error");
-    }
+  try {
+    const response = await fetchApi("/states");
+    statesList = response.states || [];
+  } catch (error) {
+    showToast("Could not load states list", "error");
+  }
 
-    const optionsHtml = statesList.map(stateName => `<option>${stateName}</option>`).join("");
-    selectElement.innerHTML = `<option value="">All India</option>` + optionsHtml;
+  const optionsHtml = statesList.map(stateName => `<option>${stateName}</option>`).join("");
+  selectElement.innerHTML = `<option value="">All India</option>` + optionsHtml;
 }
 
 /**
@@ -343,52 +343,52 @@ async function populateStateDropdown(selectElement) {
  * @returns {object} Dictionary of validated numeric values
  */
 function readFormFeatures(featureKeys, prefix = "f-") {
-    const extractedValues = {};
-    let hasValidationErrors = false;
+  const extractedValues = {};
+  let hasValidationErrors = false;
 
-    featureKeys.forEach(key => {
-        const inputElement = getElement("#" + prefix + key);
-        const errorElement = getElement("#e-" + prefix + key);
-        const definition = FIELD_DEFINITIONS[key];
+  featureKeys.forEach(key => {
+    const inputElement = getElement("#" + prefix + key);
+    const errorElement = getElement("#e-" + prefix + key);
+    const definition = FIELD_DEFINITIONS[key];
 
-        if (!inputElement) return;
+    if (!inputElement) return;
 
-        const numericValue = parseFloat(inputElement.value);
-        const isOutOfRange = isNaN(numericValue) || numericValue < definition.min || numericValue > definition.max;
+    const numericValue = parseFloat(inputElement.value);
+    const isOutOfRange = isNaN(numericValue) || numericValue < definition.min || numericValue > definition.max;
 
-        inputElement.classList.toggle("bad", isOutOfRange);
+    inputElement.classList.toggle("bad", isOutOfRange);
 
-        if (errorElement) {
-            errorElement.textContent = isOutOfRange ? `Enter between ${definition.min} and ${definition.max}` : "";
-        }
-
-        if (isOutOfRange) {
-            hasValidationErrors = true;
-        }
-
-        extractedValues[key] = numericValue;
-    });
-
-    if (hasValidationErrors) {
-        throw new Error("Please correct the highlighted fields with valid ranges.");
+    if (errorElement) {
+      errorElement.textContent = isOutOfRange ? `Enter between ${definition.min} and ${definition.max}` : "";
     }
 
-    // Persist for convenience
-    saveFormValues(extractedValues);
-    return extractedValues;
+    if (isOutOfRange) {
+      hasValidationErrors = true;
+    }
+
+    extractedValues[key] = numericValue;
+  });
+
+  if (hasValidationErrors) {
+    throw new Error("Please correct the highlighted fields with valid ranges.");
+  }
+
+  // Persist for convenience
+  saveFormValues(extractedValues);
+  return extractedValues;
 }
 
 /**
  * Populates existing HTML inputs with previously saved or default values
  */
 function restoreFieldInputs(featureKeys, prefix = "f-") {
-    const saved = getLastSavedFormValues();
-    featureKeys.forEach(key => {
-        const inputElement = getElement("#" + prefix + key);
-        if (inputElement && saved[key] !== undefined) {
-            inputElement.value = saved[key];
-        }
-    });
+  const saved = getLastSavedFormValues();
+  featureKeys.forEach(key => {
+    const inputElement = getElement("#" + prefix + key);
+    if (inputElement && saved[key] !== undefined) {
+      inputElement.value = saved[key];
+    }
+  });
 }
 
 
@@ -402,166 +402,166 @@ const pageControllers = {};
 // 4.1 Home Page
 // ----------------------------------------------------------------------------
 pageControllers.index = async function () {
-    try {
-        const metadata = await fetchApi("/meta");
-        const cropsElement = getElement("#h-crops");
-        const accuracyElement = getElement("#h-acc");
-        const modelElement = getElement("#h-model");
+  try {
+    const metadata = await fetchApi("/meta");
+    const cropsElement = getElement("#h-crops");
+    const accuracyElement = getElement("#h-acc");
+    const modelElement = getElement("#h-model");
 
-        if (cropsElement) cropsElement.textContent = metadata.n_crops;
-        if (accuracyElement) accuracyElement.textContent = (metadata.test_accuracy * 100).toFixed(1) + "%";
-        if (modelElement) modelElement.textContent = metadata.best_model;
-    } catch (e) {
-        console.warn("Could not load homepage metadata", e);
-    }
+    if (cropsElement) cropsElement.textContent = metadata.n_crops;
+    if (accuracyElement) accuracyElement.textContent = (metadata.test_accuracy * 100).toFixed(1) + "%";
+    if (modelElement) modelElement.textContent = metadata.best_model;
+  } catch (e) {
+    console.warn("Could not load homepage metadata", e);
+  }
 };
 
 // ----------------------------------------------------------------------------
 // 4.2 Dashboard Page
 // ----------------------------------------------------------------------------
 pageControllers.dashboard = async function () {
-    // 1. Fetch metadata and model performance comparison in parallel
-    const [metadata, metricsData] = await Promise.all([
-        fetchApi("/meta"),
-        fetchApi("/metrics")
-    ]);
+  // 1. Fetch metadata and model performance comparison in parallel
+  const [metadata, metricsData] = await Promise.all([
+    fetchApi("/meta"),
+    fetchApi("/metrics")
+  ]);
 
-    // 2. Populate stats cards
-    getElement("#d-crops").textContent = metadata.n_crops;
-    getElement("#d-model").textContent = metadata.best_model;
-    getElement("#d-acc").textContent = (metadata.test_accuracy * 100).toFixed(1) + "%";
-    getElement("#d-rows").textContent = metadata.rows;
+  // 2. Populate stats cards
+  getElement("#d-crops").textContent = metadata.n_crops;
+  getElement("#d-model").textContent = metadata.best_model;
+  getElement("#d-acc").textContent = (metadata.test_accuracy * 100).toFixed(1) + "%";
+  getElement("#d-rows").textContent = metadata.rows;
 
-    // 3. Render model comparison bar chart (5-fold CV vs Test Accuracy)
-    renderChart("c-models", {
-        type: "bar",
-        data: {
-            labels: metricsData.comparison.map(m => m.Model),
-            datasets: [
-                {
-                    label: "CV Accuracy",
-                    data: metricsData.comparison.map(m => m["CV Accuracy"] * 100),
-                    backgroundColor: "#174D32"
-                },
-                {
-                    label: "Test Accuracy",
-                    data: metricsData.comparison.map(m => m["Test Accuracy"] * 100),
-                    backgroundColor: "#4C956C"
-                }
-            ]
+  // 3. Render model comparison bar chart (5-fold CV vs Test Accuracy)
+  renderChart("c-models", {
+    type: "bar",
+    data: {
+      labels: metricsData.comparison.map(m => m.Model),
+      datasets: [
+        {
+          label: "CV Accuracy",
+          data: metricsData.comparison.map(m => m["CV Accuracy"] * 100),
+          backgroundColor: "#174D32"
         },
-        options: {
-            scales: {
-                y: {
-                    min: 90,
-                    max: 100,
-                    title: { display: true, text: "Accuracy (%)" }
-                }
-            }
+        {
+          label: "Test Accuracy",
+          data: metricsData.comparison.map(m => m["Test Accuracy"] * 100),
+          backgroundColor: "#4C956C"
         }
-    });
+      ]
+    },
+    options: {
+      scales: {
+        y: {
+          min: 90,
+          max: 100,
+          title: { display: true, text: "Accuracy (%)" }
+        }
+      }
+    }
+  });
 
-    // 4. Render prediction history from localStorage
-    const historyContainer = getElement("#hist");
-    const rawHistory = JSON.parse(localStorage.getItem("ca_hist") || "[]");
+  // 4. Render prediction history from localStorage
+  const historyContainer = getElement("#hist");
+  const rawHistory = JSON.parse(localStorage.getItem("ca_hist") || "[]");
 
-    if (rawHistory.length > 0) {
-        historyContainer.innerHTML = rawHistory.map(entry => {
-            const dateStr = new Date(entry.t).toLocaleString();
-            const cropName = entry.crop ? capitalizeFirstLetter(entry.crop) : "–";
-            const badgeClass = entry.status === "OK" ? "ok" : entry.status === "LOW_CONFIDENCE" ? "low" : "out";
-            return `
+  if (rawHistory.length > 0) {
+    historyContainer.innerHTML = rawHistory.map(entry => {
+      const dateStr = new Date(entry.t).toLocaleString();
+      const cropName = entry.crop ? capitalizeFirstLetter(entry.crop) : "–";
+      const badgeClass = entry.status === "OK" ? "ok" : entry.status === "LOW_CONFIDENCE" ? "low" : "out";
+      return `
                 <tr>
                     <td>${dateStr}</td>
                     <td><b>${cropName}</b></td>
                     <td>${renderBadge(badgeClass, entry.status.replace("_", " "))}</td>
                 </tr>
             `;
-        }).join("");
-    } else {
-        historyContainer.innerHTML = `
+    }).join("");
+  } else {
+    historyContainer.innerHTML = `
             <tr>
                 <td colspan="3">${renderEmptyPlaceholder("fa-clock-rotate-left", "No predictions yet. Run one on the recommendation page.")}</td>
             </tr>
         `;
-    }
+  }
 
-    // 5. Clear history button event listener
-    const clearHistoryButton = getElement("#clear-hist");
-    if (clearHistoryButton) {
-        clearHistoryButton.onclick = function () {
-            localStorage.removeItem("ca_hist");
-            showToast("Prediction history cleared");
-            pageControllers.dashboard();
-        };
-    }
+  // 5. Clear history button event listener
+  const clearHistoryButton = getElement("#clear-hist");
+  if (clearHistoryButton) {
+    clearHistoryButton.onclick = function () {
+      localStorage.removeItem("ca_hist");
+      showToast("Prediction history cleared");
+      pageControllers.dashboard();
+    };
+  }
 };
 
 // ----------------------------------------------------------------------------
 // 4.3 Crop Recommendation Page
 // ----------------------------------------------------------------------------
 pageControllers.recommendation = async function () {
-    const stateSelect = getElement("#state");
-    const fillExampleBtn = getElement("#fill-example");
-    const formElement = getElement("#predict-form");
+  const stateSelect = getElement("#state");
+  const fillExampleBtn = getElement("#fill-example");
+  const formElement = getElement("#predict-form");
 
-    // 1. Populate states dynamically and restore saved input values
-    populateStateDropdown(stateSelect);
-    restoreFieldInputs(Object.keys(FIELD_DEFINITIONS));
+  // 1. Populate states dynamically and restore saved input values
+  populateStateDropdown(stateSelect);
+  restoreFieldInputs(Object.keys(FIELD_DEFINITIONS));
 
-    // 2. Pre-fill typical Rice example values
-    if (fillExampleBtn) {
-        fillExampleBtn.onclick = function () {
-            Object.entries(FIELD_DEFINITIONS).forEach(([key, def]) => {
-                const input = getElement("#f-" + key);
-                if (input) input.value = def.defaultValue;
-            });
-            showToast("Example values loaded (typical rice conditions)");
-        };
-    }
-
-    // 3. Form submit handler
-    formElement.onsubmit = function (event) {
-        event.preventDefault();
-        const submitButton = getElement("#go");
-
-        executeWithLoadingState(submitButton, async function () {
-            // Read all 7 input values
-            const conditionsPayload = readFormFeatures(Object.keys(FIELD_DEFINITIONS));
-            conditionsPayload.state = stateSelect.value || null;
-
-            // Send to FastAPI /predict
-            const predictionResult = await fetchApi("/predict", conditionsPayload);
-
-            // Display results in UI
-            displayRecommendationResult(predictionResult);
-
-            // Append to local prediction history (keep last 6)
-            const history = JSON.parse(localStorage.getItem("ca_hist") || "[]");
-            history.unshift({
-                t: Date.now(),
-                crop: predictionResult.crop,
-                status: predictionResult.status,
-                p: predictionResult.top_k && predictionResult.top_k[0] ? predictionResult.top_k[0].probability : null
-            });
-            localStorage.setItem("ca_hist", JSON.stringify(history.slice(0, 6)));
-
-            // Smooth scroll to result
-            getElement("#result").scrollIntoView({ behavior: "smooth", block: "start" });
-        });
+  // 2. Pre-fill typical Rice example values
+  if (fillExampleBtn) {
+    fillExampleBtn.onclick = function () {
+      Object.entries(FIELD_DEFINITIONS).forEach(([key, def]) => {
+        const input = getElement("#f-" + key);
+        if (input) input.value = def.defaultValue;
+      });
+      showToast("Example values loaded (typical rice conditions)");
     };
+  }
+
+  // 3. Form submit handler
+  formElement.onsubmit = function (event) {
+    event.preventDefault();
+    const submitButton = getElement("#go");
+
+    executeWithLoadingState(submitButton, async function () {
+      // Read all 7 input values
+      const conditionsPayload = readFormFeatures(Object.keys(FIELD_DEFINITIONS));
+      conditionsPayload.state = stateSelect.value || null;
+
+      // Send to FastAPI /predict
+      const predictionResult = await fetchApi("/predict", conditionsPayload);
+
+      // Display results in UI
+      displayRecommendationResult(predictionResult);
+
+      // Append to local prediction history (keep last 6)
+      const history = JSON.parse(localStorage.getItem("ca_hist") || "[]");
+      history.unshift({
+        t: Date.now(),
+        crop: predictionResult.crop,
+        status: predictionResult.status,
+        p: predictionResult.top_k && predictionResult.top_k[0] ? predictionResult.top_k[0].probability : null
+      });
+      localStorage.setItem("ca_hist", JSON.stringify(history.slice(0, 6)));
+
+      // Smooth scroll to result
+      getElement("#result").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 };
 
 /**
  * Renders the recommendation prediction results, confidence meters, and Chart.js graphs
  */
 function displayRecommendationResult(result) {
-    const status = result.status;
-    let htmlContent = "";
+  const status = result.status;
+  let htmlContent = "";
 
-    // CASE A: Out of Distribution / Unusual Range
-    if (status === "OUT_OF_RANGE") {
-        htmlContent += `
+  // CASE A: Out of Distribution / Unusual Range
+  if (status === "OUT_OF_RANGE") {
+    htmlContent += `
             <div class="alert bad">
                 <b><i class="fa-solid fa-triangle-exclamation"></i> Out of range – no crop recommended.</b>
                 <p>These values are unlike anything the model was trained on, so any ML recommendation would be unreliable.</p>
@@ -570,13 +570,13 @@ function displayRecommendationResult(result) {
                 </ul>
             </div>
         `;
-    } 
-    // CASE B: Valid Recommendation (OK or LOW_CONFIDENCE)
-    else {
-        const topCrop = result.top_k[0];
-        const statusBadgeClass = status === "OK" ? "ok" : "low";
+  }
+  // CASE B: Valid Recommendation (OK or LOW_CONFIDENCE)
+  else {
+    const topCrop = result.top_k[0];
+    const statusBadgeClass = status === "OK" ? "ok" : "low";
 
-        htmlContent += `
+    htmlContent += `
             <div class="result-top">
                 <span class="badge b-${statusBadgeClass}">${status.replace("_", " ")}</span>
                 <div style="margin-top:8px;opacity:.85">Recommended crop</div>
@@ -590,8 +590,8 @@ function displayRecommendationResult(result) {
             </div>
         `;
 
-        if (result.reasons && result.reasons.length > 0) {
-            htmlContent += `
+    if (result.reasons && result.reasons.length > 0) {
+      htmlContent += `
                 <div class="alert">
                     <b>Why confidence is not high:</b>
                     <ul>
@@ -600,10 +600,10 @@ function displayRecommendationResult(result) {
                     <div>Consider the top 3 options below as a shortlist.</div>
                 </div>
             `;
-        }
+    }
 
-        // Top 3 Crops Graph Container
-        htmlContent += `
+    // Top 3 Crops Graph Container
+    htmlContent += `
             <div class="panel">
                 <h3><i class="fa-solid fa-ranking-star"></i> Top 3 Recommended Crops</h3>
                 <div class="chart-box" style="height:200px">
@@ -620,10 +620,10 @@ function displayRecommendationResult(result) {
                 </div>
             </div>
         `;
-    }
+  }
 
-    // Reliability & Sensitivity Diagnostics
-    htmlContent += `
+  // Reliability & Sensitivity Diagnostics
+  htmlContent += `
         <div class="kv">
             <div>
                 <b>${result.normalized_entropy}</b>
@@ -650,75 +650,75 @@ function displayRecommendationResult(result) {
         <p class="note">${result.note} Out-of-range detection is statistical (Mahalanobis distance vs 99th percentile).</p>
     `;
 
-    getElement("#result").innerHTML = htmlContent;
+  getElement("#result").innerHTML = htmlContent;
 
-    // Render Charts if recommendation was valid
-    if (status !== "OUT_OF_RANGE") {
-        // Chart 1: Top 3 Crop Probabilities
-        renderChart("c-top", {
-            type: "bar",
-            data: {
-                labels: result.top_k.map(item => capitalizeFirstLetter(item.crop)),
-                datasets: [{
-                    data: result.top_k.map(item => item.probability * 100),
-                    backgroundColor: CHART_COLORS
-                }]
-            },
-            options: {
-                indexAxis: "y",
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { max: 100, title: { display: true, text: "Probability (%)" } }
-                }
-            }
-        });
+  // Render Charts if recommendation was valid
+  if (status !== "OUT_OF_RANGE") {
+    // Chart 1: Top 3 Crop Probabilities
+    renderChart("c-top", {
+      type: "bar",
+      data: {
+        labels: result.top_k.map(item => capitalizeFirstLetter(item.crop)),
+        datasets: [{
+          data: result.top_k.map(item => item.probability * 100),
+          backgroundColor: CHART_COLORS
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { max: 100, title: { display: true, text: "Probability (%)" } }
+        }
+      }
+    });
 
-        // Chart 2: Feature Attribution Explanation
-        renderChart("c-exp", {
-            type: "bar",
-            data: {
-                labels: result.explanation.map(item => `${item.feature} = ${item.value}`),
-                datasets: [{
-                    data: result.explanation.map(item => item.effect),
-                    backgroundColor: result.explanation.map(item => item.effect >= 0 ? "#4C956C" : "#B3392F")
-                }]
-            },
-            options: {
-                indexAxis: "y",
-                plugins: { legend: { display: false } }
-            }
-        });
-    }
+    // Chart 2: Feature Attribution Explanation
+    renderChart("c-exp", {
+      type: "bar",
+      data: {
+        labels: result.explanation.map(item => `${item.feature} = ${item.value}`),
+        datasets: [{
+          data: result.explanation.map(item => item.effect),
+          backgroundColor: result.explanation.map(item => item.effect >= 0 ? "#4C956C" : "#B3392F")
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
 }
 
 // ----------------------------------------------------------------------------
 // 4.4 Ideal Conditions Explorer
 // ----------------------------------------------------------------------------
 pageControllers.ideal_conditions = async function () {
-    const searchInput = getElement("#q");
-    const seasonFilter = getElement("#season");
-    const cardsContainer = getElement("#cards");
+  const searchInput = getElement("#q");
+  const seasonFilter = getElement("#season");
+  const cardsContainer = getElement("#cards");
 
-    // Load full crops catalog
-    const baseCrops = await getCropsList();
-    const detailedCrops = await Promise.all(baseCrops.map(c => fetchApi("/crops/" + c.crop)));
+  // Load full crops catalog
+  const baseCrops = await getCropsList();
+  const detailedCrops = await Promise.all(baseCrops.map(c => fetchApi("/crops/" + c.crop)));
 
-    function renderFilteredCards() {
-        const query = searchInput.value.toLowerCase().trim();
-        const selectedSeason = seasonFilter.value;
+  function renderFilteredCards() {
+    const query = searchInput.value.toLowerCase().trim();
+    const selectedSeason = seasonFilter.value;
 
-        const filtered = detailedCrops.filter(c => {
-            const matchesQuery = c.crop.toLowerCase().includes(query);
-            const matchesSeason = !selectedSeason || c.seasons.includes(selectedSeason);
-            return matchesQuery && matchesSeason;
-        });
+    const filtered = detailedCrops.filter(c => {
+      const matchesQuery = c.crop.toLowerCase().includes(query);
+      const matchesSeason = !selectedSeason || c.seasons.includes(selectedSeason);
+      return matchesQuery && matchesSeason;
+    });
 
-        if (filtered.length === 0) {
-            cardsContainer.innerHTML = renderEmptyPlaceholder("fa-leaf", "No crops match your filter.");
-            return;
-        }
+    if (filtered.length === 0) {
+      cardsContainer.innerHTML = renderEmptyPlaceholder("fa-leaf", "No crops match your filter.");
+      return;
+    }
 
-        cardsContainer.innerHTML = filtered.map(c => `
+    cardsContainer.innerHTML = filtered.map(c => `
             <div class="card crop-card">
                 <h3>${capitalizeFirstLetter(c.crop)} <span class="badge b-ideal">${c.duration_days} days</span></h3>
                 <div class="tags">
@@ -741,37 +741,37 @@ pageControllers.ideal_conditions = async function () {
                 </div>
             </div>
         `).join("");
-    }
+  }
 
-    searchInput.oninput = renderFilteredCards;
-    seasonFilter.onchange = renderFilteredCards;
-    renderFilteredCards();
+  searchInput.oninput = renderFilteredCards;
+  seasonFilter.onchange = renderFilteredCards;
+  renderFilteredCards();
 };
 
 // ----------------------------------------------------------------------------
 // 4.5 Land Suitability Checker
 // ----------------------------------------------------------------------------
 pageControllers.land_check = async function () {
-    const cropSelect = getElement("#crop");
-    const formElement = getElement("#form");
+  const cropSelect = getElement("#crop");
+  const formElement = getElement("#form");
 
-    await populateCropDropdown(cropSelect, false);
-    restoreFieldInputs(Object.keys(FIELD_DEFINITIONS));
+  await populateCropDropdown(cropSelect, false);
+  restoreFieldInputs(Object.keys(FIELD_DEFINITIONS));
 
-    formElement.onsubmit = function (event) {
-        event.preventDefault();
-        const submitButton = getElement("#go");
+  formElement.onsubmit = function (event) {
+    event.preventDefault();
+    const submitButton = getElement("#go");
 
-        executeWithLoadingState(submitButton, async function () {
-            const conditions = readFormFeatures(Object.keys(FIELD_DEFINITIONS));
-            const payload = {
-                crop: cropSelect.value,
-                conditions: conditions
-            };
+    executeWithLoadingState(submitButton, async function () {
+      const conditions = readFormFeatures(Object.keys(FIELD_DEFINITIONS));
+      const payload = {
+        crop: cropSelect.value,
+        conditions: conditions
+      };
 
-            const result = await fetchApi("/land-check", payload);
+      const result = await fetchApi("/land-check", payload);
 
-            getElement("#result").innerHTML = `
+      getElement("#result").innerHTML = `
                 <div class="panel" style="text-align:center">
                     <div class="gauge" style="--p:${result.score}">
                         <span>${result.score}%</span>
@@ -794,16 +794,16 @@ pageControllers.land_check = async function () {
                 </div>
                 <div class="panel">
                     <h3><i class="fa-solid fa-screwdriver-wrench"></i> What to Improve</h3>
-                    ${result.improvements.length > 0 
-                        ? `<ul>${result.improvements.map(tip => `<li>${tip}</li>`).join("")}</ul>`
-                        : "<p>All soil and climate conditions are within the crop's ideal range.</p>"
-                    }
+                    ${result.improvements.length > 0
+          ? `<ul>${result.improvements.map(tip => `<li>${tip}</li>`).join("")}</ul>`
+          : "<p>All soil and climate conditions are within the crop's ideal range.</p>"
+        }
                 </div>
                 <div class="panel">
                     <h3><i class="fa-solid fa-brain"></i> Machine Learning Opinion</h3>
                     ${result.ml.status === "OUT_OF_RANGE"
-                        ? `<div class="alert bad">Inputs are out of the model's range – no ML opinion available.</div>`
-                        : `
+          ? `<div class="alert bad">Inputs are out of the model's range – no ML opinion available.</div>`
+          : `
                             <p>
                                 Model's top recommendation for this land: <b>${capitalizeFirstLetter(result.ml.predicted_crop)}</b> 
                                 (${renderBadge(result.ml.status === "OK" ? "ok" : "low", result.ml.status.replace("_", " "))}).
@@ -813,49 +813,49 @@ pageControllers.land_check = async function () {
                                 <b>${((result.ml.probability_for_selected_crop || 0) * 100).toFixed(1)}%</b>.
                             </p>
                         `
-                    }
+        }
                     <div class="note">${result.note}</div>
                 </div>
             `;
-        });
-    };
+    });
+  };
 };
 
 // ----------------------------------------------------------------------------
 // 4.6 Fertilizer Planning
 // ----------------------------------------------------------------------------
 pageControllers.fertilizer = async function () {
-    const cropSelect = getElement("#crop");
-    const areaInput = getElement("#area");
-    const formElement = getElement("#form");
+  const cropSelect = getElement("#crop");
+  const areaInput = getElement("#area");
+  const formElement = getElement("#form");
 
-    await populateCropDropdown(cropSelect, false);
-    restoreFieldInputs(["N", "P", "K"]);
+  await populateCropDropdown(cropSelect, false);
+  restoreFieldInputs(["N", "P", "K"]);
 
-    formElement.onsubmit = function (event) {
-        event.preventDefault();
-        const submitButton = getElement("#go");
+  formElement.onsubmit = function (event) {
+    event.preventDefault();
+    const submitButton = getElement("#go");
 
-        executeWithLoadingState(submitButton, async function () {
-            const soilNutrients = readFormFeatures(["N", "P", "K"]);
-            const areaValue = parseFloat(areaInput.value);
+    executeWithLoadingState(submitButton, async function () {
+      const soilNutrients = readFormFeatures(["N", "P", "K"]);
+      const areaValue = parseFloat(areaInput.value);
 
-            if (!(areaValue > 0)) {
-                throw new Error("Land area must be greater than 0");
-            }
+      if (!(areaValue > 0)) {
+        throw new Error("Land area must be greater than 0");
+      }
 
-            const payload = {
-                crop: cropSelect.value,
-                N: soilNutrients.N,
-                P: soilNutrients.P,
-                K: soilNutrients.K,
-                area_ha: areaValue
-            };
+      const payload = {
+        crop: cropSelect.value,
+        N: soilNutrients.N,
+        P: soilNutrients.P,
+        K: soilNutrients.K,
+        area_ha: areaValue
+      };
 
-            const result = await fetchApi("/fertilizer", payload);
-            const quantities = result.quantity;
+      const result = await fetchApi("/fertilizer", payload);
+      const quantities = result.quantity;
 
-            getElement("#result").innerHTML = `
+      getElement("#result").innerHTML = `
                 <div class="kv">
                     <div><b>${Math.round(quantities.urea_kg)} kg</b><span>Total Urea</span></div>
                     <div><b>${Math.round(quantities.dap_kg)} kg</b><span>Total DAP</span></div>
@@ -911,39 +911,39 @@ pageControllers.fertilizer = async function () {
                     </ul>
                 </div>
             `;
-        });
-    };
+    });
+  };
 };
 
 // ----------------------------------------------------------------------------
 // 4.7 Market Prices (Live Agmarknet & Reference)
 // ----------------------------------------------------------------------------
 pageControllers.market = async function () {
-    const cropSelect = getElement("#crop");
-    const stateSelect = getElement("#state");
-    const formElement = getElement("#form");
+  const cropSelect = getElement("#crop");
+  const stateSelect = getElement("#state");
+  const formElement = getElement("#form");
 
-    await Promise.all([
-        populateCropDropdown(cropSelect, false),
-        populateStateDropdown(stateSelect)
-    ]);
+  await Promise.all([
+    populateCropDropdown(cropSelect, false),
+    populateStateDropdown(stateSelect)
+  ]);
 
-    formElement.onsubmit = function (event) {
-        event.preventDefault();
-        const submitButton = getElement("#go");
+  formElement.onsubmit = function (event) {
+    event.preventDefault();
+    const submitButton = getElement("#go");
 
-        executeWithLoadingState(submitButton, async function () {
-            const cropName = cropSelect.value;
-            const stateValue = stateSelect.value;
-            let queryUrl = `/market/${cropName}`;
-            if (stateValue) {
-                queryUrl += `?state=${encodeURIComponent(stateValue)}`;
-            }
+    executeWithLoadingState(submitButton, async function () {
+      const cropName = cropSelect.value;
+      const stateValue = stateSelect.value;
+      let queryUrl = `/market/${cropName}`;
+      if (stateValue) {
+        queryUrl += `?state=${encodeURIComponent(stateValue)}`;
+      }
 
-            const marketData = await fetchApi(queryUrl);
-            const isLive = marketData.type === "live";
+      const marketData = await fetchApi(queryUrl);
+      const isLive = marketData.type === "live";
 
-            let html = `
+      let html = `
                 <div class="panel">
                     <div class="inl" style="justify-content:space-between">
                         ${renderBadge(isLive ? "live" : "ref", isLive ? "LIVE MANDI PRICES" : "REFERENCE PRICE (not live)")}
@@ -956,8 +956,8 @@ pageControllers.market = async function () {
                     <p style="margin-top:8px">${marketData.message}</p>
             `;
 
-            if (isLive && marketData.records && marketData.records.length > 0) {
-                html += `
+      if (isLive && marketData.records && marketData.records.length > 0) {
+        html += `
                         <div class="chart-box"><canvas id="c-mk"></canvas></div>
                     </div>
                     <div class="panel tw">
@@ -978,94 +978,94 @@ pageControllers.market = async function () {
                     </div>
                 `;
 
-                getElement("#result").innerHTML = html;
+        getElement("#result").innerHTML = html;
 
-                // Render Mandi Price Range Chart
-                const sampleRecords = marketData.records.slice(0, 15);
-                renderChart("c-mk", {
-                    type: "bar",
-                    data: {
-                        labels: sampleRecords.map(r => r.market),
-                        datasets: [
-                            { label: "Min Price", data: sampleRecords.map(r => r.min), backgroundColor: "#DCECCB" },
-                            { label: "Modal (Typical)", data: sampleRecords.map(r => r.modal), backgroundColor: "#4C956C" },
-                            { label: "Max Price", data: sampleRecords.map(r => r.max), backgroundColor: "#174D32" }
-                        ]
-                    },
-                    options: {
-                        scales: {
-                            y: { title: { display: true, text: "₹ / quintal" } }
-                        }
-                    }
-                });
-            } else {
-                html += `
+        // Render Mandi Price Range Chart
+        const sampleRecords = marketData.records.slice(0, 15);
+        renderChart("c-mk", {
+          type: "bar",
+          data: {
+            labels: sampleRecords.map(r => r.market),
+            datasets: [
+              { label: "Min Price", data: sampleRecords.map(r => r.min), backgroundColor: "#DCECCB" },
+              { label: "Modal (Typical)", data: sampleRecords.map(r => r.modal), backgroundColor: "#4C956C" },
+              { label: "Max Price", data: sampleRecords.map(r => r.max), backgroundColor: "#174D32" }
+            ]
+          },
+          options: {
+            scales: {
+              y: { title: { display: true, text: "₹ / quintal" } }
+            }
+          }
+        });
+      } else {
+        html += `
                     <div class="kv">
                         <div><b>${formatRupees(marketData.reference_price)}</b><span>Reference Price per Quintal</span></div>
                     </div>
                     <div class="note">No live mandi records returned for this commodity/state. Showing indicative MSP / baseline reference rates.</div>
                 </div>`;
-                getElement("#result").innerHTML = html;
-            }
-        });
-    };
+        getElement("#result").innerHTML = html;
+      }
+    });
+  };
 };
 
 // ----------------------------------------------------------------------------
 // 4.8 Profit & Yield Estimator
 // ----------------------------------------------------------------------------
 pageControllers.profit = async function () {
-    const cropSelect = getElement("#crop");
-    const stateSelect = getElement("#state");
-    const areaInput = getElement("#area");
-    const priceInput = getElement("#price");
-    const yieldInput = getElement("#yld");
-    const costInput = getElement("#cost");
-    const durationInput = getElement("#dur");
-    const formElement = getElement("#form");
+  const cropSelect = getElement("#crop");
+  const stateSelect = getElement("#state");
+  const areaInput = getElement("#area");
+  const priceInput = getElement("#price");
+  const yieldInput = getElement("#yld");
+  const costInput = getElement("#cost");
+  const durationInput = getElement("#dur");
+  const formElement = getElement("#form");
 
-    await Promise.all([
-        populateCropDropdown(cropSelect, false),
-        populateStateDropdown(stateSelect)
-    ]);
+  await Promise.all([
+    populateCropDropdown(cropSelect, false),
+    populateStateDropdown(stateSelect)
+  ]);
 
-    // Update input placeholders with default crop values on change
-    async function updatePlaceholders() {
-        const cropDetails = await fetchApi("/crops/" + cropSelect.value);
-        priceInput.placeholder = cropDetails.ref_price;
-        yieldInput.placeholder = cropDetails.yield_q_ha;
-        costInput.placeholder = cropDetails.cost_ha;
-        durationInput.placeholder = cropDetails.duration_days;
-    }
+  // Update input placeholders with default crop values on change
+  async function updatePlaceholders() {
+    const cropDetails = await fetchApi("/crops/" + cropSelect.value);
+    priceInput.placeholder = cropDetails.ref_price;
+    yieldInput.placeholder = cropDetails.yield_q_ha;
+    costInput.placeholder = cropDetails.cost_ha;
+    durationInput.placeholder = cropDetails.duration_days;
+  }
 
-    cropSelect.onchange = updatePlaceholders;
-    await updatePlaceholders();
+  cropSelect.onchange = updatePlaceholders;
+  await updatePlaceholders();
 
-    formElement.onsubmit = function (event) {
-        event.preventDefault();
-        const submitButton = getElement("#go");
+  formElement.onsubmit = function (event) {
+    event.preventDefault();
+    const submitButton = getElement("#go");
 
-        executeWithLoadingState(submitButton, async function () {
-            const payload = {
-                crop: cropSelect.value,
-                area_ha: parseFloat(areaInput.value),
-                state: stateSelect.value || null
-            };
+    executeWithLoadingState(submitButton, async function () {
+      const payload = {
+        crop: cropSelect.value,
+        area_ha: parseFloat(areaInput.value),
+        state: stateSelect.value || null
+      };
 
-            const customPrice = parseFloat(priceInput.value);
-            const customYield = parseFloat(yieldInput.value);
-            const customCost = parseFloat(costInput.value);
-            const customDuration = parseInt(durationInput.value, 10);
+      const customPrice = parseFloat(priceInput.value);
+      const customYield = parseFloat(yieldInput.value);
+      const customCost = parseFloat(costInput.value);
+      const customDuration = parseInt(durationInput.value, 10);
 
-            if (!isNaN(customPrice)) payload.price_per_q = customPrice;
-            if (!isNaN(customYield)) payload.yield_q_ha = customYield;
-            if (!isNaN(customCost)) payload.cost_per_ha = customCost;
-            if (!isNaN(customDuration)) payload.duration_days = customDuration;
+      if (!isNaN(customPrice)) payload.price_per_q = customPrice;
+      if (!isNaN(customYield)) payload.yield_q_ha = customYield;
+      if (!isNaN(customCost)) payload.cost_per_ha = customCost;
+      if (!isNaN(customDuration)) payload.duration_days = customDuration;
 
-            const result = await fetchApi("/profit", payload);
-            const scenarios = result.scenarios;
+      const result = await fetchApi("/profit", payload);
+      const scenarios = result.scenarios;
 
-            getElement("#result").innerHTML = `
+      getElement("#result").innerHTML = `
                 <div class="kv">
                     <div><b>${formatRupees(result.price_per_q)}</b><span>Price/q (${result.price_source})</span></div>
                     <div><b>${formatRupees(result.total_cost)}</b><span>Total Cultivation Cost</span></div>
@@ -1096,48 +1096,48 @@ pageControllers.profit = async function () {
                 </div>
             `;
 
-            renderChart("c-pf", {
-                type: "bar",
-                data: {
-                    labels: Object.keys(scenarios).map(capitalizeFirstLetter),
-                    datasets: [
-                        { label: "Gross Revenue", data: Object.values(scenarios).map(s => s.revenue), backgroundColor: "#4C956C" },
-                        { label: "Net Profit", data: Object.values(scenarios).map(s => s.profit), backgroundColor: "#174D32" }
-                    ]
-                },
-                options: {
-                    scales: {
-                        y: { title: { display: true, text: "Indian Rupees (₹)" } }
-                    }
-                }
-            });
-        });
-    };
+      renderChart("c-pf", {
+        type: "bar",
+        data: {
+          labels: Object.keys(scenarios).map(capitalizeFirstLetter),
+          datasets: [
+            { label: "Gross Revenue", data: Object.values(scenarios).map(s => s.revenue), backgroundColor: "#4C956C" },
+            { label: "Net Profit", data: Object.values(scenarios).map(s => s.profit), backgroundColor: "#174D32" }
+          ]
+        },
+        options: {
+          scales: {
+            y: { title: { display: true, text: "Indian Rupees (₹)" } }
+          }
+        }
+      });
+    });
+  };
 };
 
 // ----------------------------------------------------------------------------
 // 4.9 What-If Analysis & Continuous Feature Sweep
 // ----------------------------------------------------------------------------
 pageControllers.what_if = async function () {
-    const keys = Object.keys(FIELD_DEFINITIONS);
-    restoreFieldInputs(keys);
+  const keys = Object.keys(FIELD_DEFINITIONS);
+  restoreFieldInputs(keys);
 
-    const featureSelect = getElement("#sw-f");
-    const changesContainer = getElement("#changes");
-    const addChangeBtn = getElement("#add-change");
-    const whatIfForm = getElement("#form");
-    const sweepForm = getElement("#sweep-form");
+  const featureSelect = getElement("#sw-f");
+  const changesContainer = getElement("#changes");
+  const addChangeBtn = getElement("#add-change");
+  const whatIfForm = getElement("#form");
+  const sweepForm = getElement("#sweep-form");
 
-    // Populate sweep feature options
-    featureSelect.innerHTML = keys.map(k => `<option value="${k}">${FIELD_DEFINITIONS[k].label}</option>`).join("");
+  // Populate sweep feature options
+  featureSelect.innerHTML = keys.map(k => `<option value="${k}">${FIELD_DEFINITIONS[k].label}</option>`).join("");
 
-    // Function to add a delta change row
-    function createChangeRow() {
-        const row = document.createElement("div");
-        row.className = "inl chg";
-        row.style.marginBottom = "8px";
+  // Function to add a delta change row
+  function createChangeRow() {
+    const row = document.createElement("div");
+    row.className = "inl chg";
+    row.style.marginBottom = "8px";
 
-        row.innerHTML = `
+    row.innerHTML = `
             <div>
                 <label>Feature</label>
                 <select class="c-f">
@@ -1161,49 +1161,49 @@ pageControllers.what_if = async function () {
             </button>
         `;
 
-        row.querySelector("button").onclick = () => row.remove();
-        changesContainer.appendChild(row);
-    }
+    row.querySelector("button").onclick = () => row.remove();
+    changesContainer.appendChild(row);
+  }
 
-    createChangeRow();
-    addChangeBtn.onclick = createChangeRow;
+  createChangeRow();
+  addChangeBtn.onclick = createChangeRow;
 
-    // What-If Scenario Compare Submit
-    whatIfForm.onsubmit = function (event) {
-        event.preventDefault();
-        const submitButton = getElement("#go");
+  // What-If Scenario Compare Submit
+  whatIfForm.onsubmit = function (event) {
+    event.preventDefault();
+    const submitButton = getElement("#go");
 
-        executeWithLoadingState(submitButton, async function () {
-            const changes = {};
-            getAllElements(".chg").forEach(row => {
-                const featureKey = row.querySelector(".c-f").value;
-                const mode = row.querySelector(".c-m").value;
-                const value = parseFloat(row.querySelector(".c-v").value);
-                if (!isNaN(value)) {
-                    changes[featureKey] = { mode, value };
-                }
-            });
+    executeWithLoadingState(submitButton, async function () {
+      const changes = {};
+      getAllElements(".chg").forEach(row => {
+        const featureKey = row.querySelector(".c-f").value;
+        const mode = row.querySelector(".c-m").value;
+        const value = parseFloat(row.querySelector(".c-v").value);
+        if (!isNaN(value)) {
+          changes[featureKey] = { mode, value };
+        }
+      });
 
-            if (Object.keys(changes).length === 0) {
-                throw new Error("Please specify at least one change.");
-            }
+      if (Object.keys(changes).length === 0) {
+        throw new Error("Please specify at least one change.");
+      }
 
-            const baseConditions = readFormFeatures(keys);
-            const payload = {
-                base: baseConditions,
-                changes: changes
-            };
+      const baseConditions = readFormFeatures(keys);
+      const payload = {
+        base: baseConditions,
+        changes: changes
+      };
 
-            const response = await fetchApi("/what-if", payload);
-            const orig = response.original;
-            const mod = response.modified;
+      const response = await fetchApi("/what-if", payload);
+      const orig = response.original;
+      const mod = response.modified;
 
-            const formatTopCrop = cropObj => {
-                if (!cropObj.crop) return "No recommendation (Out of range)";
-                return `<b>${capitalizeFirstLetter(cropObj.crop)}</b> (${(cropObj.top_k[0].probability * 100).toFixed(0)}%)`;
-            };
+      const formatTopCrop = cropObj => {
+        if (!cropObj.crop) return "No recommendation (Out of range)";
+        return `<b>${capitalizeFirstLetter(cropObj.crop)}</b> (${(cropObj.top_k[0].probability * 100).toFixed(0)}%)`;
+      };
 
-            getElement("#result").innerHTML = `
+      getElement("#result").innerHTML = `
                 <div class="grid g2">
                     <div class="card">
                         <div class="note">Original Prediction</div>
@@ -1239,48 +1239,48 @@ pageControllers.what_if = async function () {
                 </div>
             `;
 
-            renderChart("c-wi", {
-                type: "bar",
-                data: {
-                    labels: response.probability_changes.map(p => capitalizeFirstLetter(p.crop)),
-                    datasets: [
-                        { label: "Before (%)", data: response.probability_changes.map(p => p.before * 100), backgroundColor: "#DCECCB" },
-                        { label: "After (%)", data: response.probability_changes.map(p => p.after * 100), backgroundColor: "#174D32" }
-                    ]
-                },
-                options: {
-                    scales: {
-                        y: { title: { display: true, text: "Probability (%)" } }
-                    }
-                }
-            });
-        });
-    };
+      renderChart("c-wi", {
+        type: "bar",
+        data: {
+          labels: response.probability_changes.map(p => capitalizeFirstLetter(p.crop)),
+          datasets: [
+            { label: "Before (%)", data: response.probability_changes.map(p => p.before * 100), backgroundColor: "#DCECCB" },
+            { label: "After (%)", data: response.probability_changes.map(p => p.after * 100), backgroundColor: "#174D32" }
+          ]
+        },
+        options: {
+          scales: {
+            y: { title: { display: true, text: "Probability (%)" } }
+          }
+        }
+      });
+    });
+  };
 
-    // Continuous Feature Sweep Submit
-    sweepForm.onsubmit = function (event) {
-        event.preventDefault();
-        const sweepButton = getElement("#sw-go");
+  // Continuous Feature Sweep Submit
+  sweepForm.onsubmit = function (event) {
+    event.preventDefault();
+    const sweepButton = getElement("#sw-go");
 
-        executeWithLoadingState(sweepButton, async function () {
-            const baseConditions = readFormFeatures(keys);
-            const payload = {
-                base: baseConditions,
-                feature: featureSelect.value,
-                start: parseFloat(getElement("#sw-a").value),
-                end: parseFloat(getElement("#sw-b").value),
-                steps: parseInt(getElement("#sw-n").value, 10)
-            };
+    executeWithLoadingState(sweepButton, async function () {
+      const baseConditions = readFormFeatures(keys);
+      const payload = {
+        base: baseConditions,
+        feature: featureSelect.value,
+        start: parseFloat(getElement("#sw-a").value),
+        end: parseFloat(getElement("#sw-b").value),
+        steps: parseInt(getElement("#sw-n").value, 10)
+      };
 
-            const sweepResponse = await fetchApi("/what-if/sweep", payload);
-            const distinctTopCrops = Array.from(new Set(sweepResponse.points.map(p => p.top_crop)));
+      const sweepResponse = await fetchApi("/what-if/sweep", payload);
+      const distinctTopCrops = Array.from(new Set(sweepResponse.points.map(p => p.top_crop)));
 
-            getElement("#sweep-result").innerHTML = `
+      getElement("#sweep-result").innerHTML = `
                 <div class="panel">
                     <h3><i class="fa-solid fa-chart-line"></i> Sensitivity Sweep: ${FIELD_DEFINITIONS[sweepResponse.feature].label}</h3>
                     <div class="chart-box"><canvas id="c-sw"></canvas></div>
-                    ${sweepResponse.tipping_points.length > 0 
-                        ? `
+                    ${sweepResponse.tipping_points.length > 0
+          ? `
                             <div class="alert">
                                 <b>Tipping Points Identified:</b>
                                 <ul>
@@ -1290,84 +1290,84 @@ pageControllers.what_if = async function () {
                                 </ul>
                             </div>
                         `
-                        : `<p class="note">The recommended top crop remains constant across this entire range.</p>`
-                    }
+          : `<p class="note">The recommended top crop remains constant across this entire range.</p>`
+        }
                 </div>
             `;
 
-            renderChart("c-sw", {
-                type: "line",
-                data: {
-                    labels: sweepResponse.points.map(p => p.value),
-                    datasets: distinctTopCrops.map((cropName, idx) => ({
-                        label: capitalizeFirstLetter(cropName),
-                        data: sweepResponse.points.map(p => p.probabilities[cropName] * 100),
-                        borderColor: CHART_COLORS[idx % CHART_COLORS.length],
-                        backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
-                        tension: 0.25
-                    }))
-                },
-                options: {
-                    scales: {
-                        y: { title: { display: true, text: "Probability (%)" } },
-                        x: { title: { display: true, text: FIELD_DEFINITIONS[sweepResponse.feature].label } }
-                    }
-                }
-            });
-        });
-    };
+      renderChart("c-sw", {
+        type: "line",
+        data: {
+          labels: sweepResponse.points.map(p => p.value),
+          datasets: distinctTopCrops.map((cropName, idx) => ({
+            label: capitalizeFirstLetter(cropName),
+            data: sweepResponse.points.map(p => p.probabilities[cropName] * 100),
+            borderColor: CHART_COLORS[idx % CHART_COLORS.length],
+            backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
+            tension: 0.25
+          }))
+        },
+        options: {
+          scales: {
+            y: { title: { display: true, text: "Probability (%)" } },
+            x: { title: { display: true, text: FIELD_DEFINITIONS[sweepResponse.feature].label } }
+          }
+        }
+      });
+    });
+  };
 
-    // Pre-populate sweep range inputs when selected feature changes
-    function autoSetSweepBounds() {
-        const featDef = FIELD_DEFINITIONS[featureSelect.value];
-        getElement("#sw-a").value = featDef.min === 0 ? 0 : featDef.min;
-        getElement("#sw-b").value = Math.min(featDef.max, featDef.defaultValue * 2 || featDef.max);
-    }
+  // Pre-populate sweep range inputs when selected feature changes
+  function autoSetSweepBounds() {
+    const featDef = FIELD_DEFINITIONS[featureSelect.value];
+    getElement("#sw-a").value = featDef.min === 0 ? 0 : featDef.min;
+    getElement("#sw-b").value = Math.min(featDef.max, featDef.defaultValue * 2 || featDef.max);
+  }
 
-    featureSelect.onchange = autoSetSweepBounds;
-    featureSelect.value = "rainfall";
-    autoSetSweepBounds();
+  featureSelect.onchange = autoSetSweepBounds;
+  featureSelect.value = "rainfall";
+  autoSetSweepBounds();
 };
 
 // ----------------------------------------------------------------------------
 // 4.10 Crop Rotation Suggestions
 // ----------------------------------------------------------------------------
 pageControllers.rotation = async function () {
-    const cropSelect = getElement("#crop");
-    const seasonSelect = getElement("#season");
-    const useMlCheckbox = getElement("#use-ml");
-    const mlBox = getElement("#ml-box");
-    const formElement = getElement("#form");
+  const cropSelect = getElement("#crop");
+  const seasonSelect = getElement("#season");
+  const useMlCheckbox = getElement("#use-ml");
+  const mlBox = getElement("#ml-box");
+  const formElement = getElement("#form");
 
-    await populateCropDropdown(cropSelect, false);
-    restoreFieldInputs(Object.keys(FIELD_DEFINITIONS));
+  await populateCropDropdown(cropSelect, false);
+  restoreFieldInputs(Object.keys(FIELD_DEFINITIONS));
 
-    useMlCheckbox.onchange = function () {
-        mlBox.hidden = !useMlCheckbox.checked;
-    };
+  useMlCheckbox.onchange = function () {
+    mlBox.hidden = !useMlCheckbox.checked;
+  };
 
-    formElement.onsubmit = function (event) {
-        event.preventDefault();
-        const submitButton = getElement("#go");
+  formElement.onsubmit = function (event) {
+    event.preventDefault();
+    const submitButton = getElement("#go");
 
-        executeWithLoadingState(submitButton, async function () {
-            const payload = {
-                previous_crop: cropSelect.value,
-                next_season: seasonSelect.value || null
-            };
+    executeWithLoadingState(submitButton, async function () {
+      const payload = {
+        previous_crop: cropSelect.value,
+        next_season: seasonSelect.value || null
+      };
 
-            if (useMlCheckbox.checked) {
-                payload.conditions = readFormFeatures(Object.keys(FIELD_DEFINITIONS));
-            }
+      if (useMlCheckbox.checked) {
+        payload.conditions = readFormFeatures(Object.keys(FIELD_DEFINITIONS));
+      }
 
-            const response = await fetchApi("/rotation", payload);
+      const response = await fetchApi("/rotation", payload);
 
-            if (!response.suggestions || response.suggestions.length === 0) {
-                getElement("#result").innerHTML = renderEmptyPlaceholder("fa-rotate", "No suitable crop rotations found for that season. Try another.");
-                return;
-            }
+      if (!response.suggestions || response.suggestions.length === 0) {
+        getElement("#result").innerHTML = renderEmptyPlaceholder("fa-rotate", "No suitable crop rotations found for that season. Try another.");
+        return;
+      }
 
-            getElement("#result").innerHTML = response.suggestions.map((sug, index) => `
+      getElement("#result").innerHTML = response.suggestions.map((sug, index) => `
                 <div class="card" style="margin-bottom:14px">
                     <h3 style="text-transform:capitalize">
                         ${index + 1}. ${sug.crop} <span class="badge b-ideal">Agronomic Score: ${sug.score}</span>
@@ -1381,31 +1381,31 @@ pageControllers.rotation = async function () {
                     </ul>
                 </div>
             `).join("") + `<div class="note">${response.disclaimer}</div>`;
-        });
-    };
+    });
+  };
 };
 
 // ----------------------------------------------------------------------------
 // 4.11 Model Performance & Decision Tree Rules
 // ----------------------------------------------------------------------------
 pageControllers.model_performance = async function () {
-    // Fetch metrics, class-wise F1, robustness tests, and surrogate tree rules in parallel
-    const [metrics, classwiseMetrics, robustnessData, decisionRules] = await Promise.all([
-        fetchApi("/metrics"),
-        fetchApi("/metrics/classwise"),
-        fetchApi("/metrics/robustness"),
-        fetchApi("/metrics/decision-rules")
-    ]);
+  // Fetch metrics, class-wise F1, robustness tests, and surrogate tree rules in parallel
+  const [metrics, classwiseMetrics, robustnessData, decisionRules] = await Promise.all([
+    fetchApi("/metrics"),
+    fetchApi("/metrics/classwise"),
+    fetchApi("/metrics/robustness"),
+    fetchApi("/metrics/decision-rules")
+  ]);
 
-    // 1. Display Selected Model & Tie-Break Logic
-    getElement("#best").innerHTML = `
+  // 1. Display Selected Model & Tie-Break Logic
+  getElement("#best").innerHTML = `
         ${metrics.best_model} 
         <small>(selected among ${metrics.tied_models.join(", ")} – tied within ±${metrics.tie_tolerance} CV accuracy)</small>
     `;
 
-    // 2. Render Full 8-Model Comparison Table
-    const comparisonTable = getElement("#cmp");
-    comparisonTable.innerHTML = `
+  // 2. Render Full 8-Model Comparison Table
+  const comparisonTable = getElement("#cmp");
+  comparisonTable.innerHTML = `
         <thead>
             <tr>
                 <th>Model</th>
@@ -1434,61 +1434,263 @@ pageControllers.model_performance = async function () {
         </tbody>
     `;
 
-    // 3. Render Class-Wise F1 Chart
-    const cropClasses = Object.keys(classwiseMetrics).filter(
-        k => !["accuracy", "macro avg", "weighted avg"].includes(k)
-    );
+  // 3. Render Class-Wise F1 Chart
+  const cropClasses = Object.keys(classwiseMetrics).filter(
+    k => !["accuracy", "macro avg", "weighted avg"].includes(k)
+  );
 
-    renderChart("c-cw", {
-        type: "bar",
-        data: {
-            labels: cropClasses.map(capitalizeFirstLetter),
-            datasets: [{
-                label: "F1-score",
-                data: cropClasses.map(c => classwiseMetrics[c]["f1-score"]),
-                backgroundColor: "#4C956C"
-            }]
+  renderChart("c-cw", {
+    type: "bar",
+    data: {
+      labels: cropClasses.map(capitalizeFirstLetter),
+      datasets: [{
+        label: "F1-score",
+        data: cropClasses.map(c => classwiseMetrics[c]["f1-score"]),
+        backgroundColor: "#4C956C"
+      }]
+    },
+    options: {
+      scales: {
+        y: { min: 0.90, max: 1.01, title: { display: true, text: "F1-Score" } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // 4. Render Robustness & Feature Perturbation Chart
+  renderChart("c-rb", {
+    type: "bar",
+    data: {
+      labels: Object.keys(robustnessData.single_feature).map(k => FIELD_DEFINITIONS[k].label.replace(/ \(.*/, "")),
+      datasets: [
+        {
+          label: "Noise on Single Feature",
+          data: Object.values(robustnessData.single_feature).map(v => v * 100),
+          backgroundColor: "#174D32"
         },
-        options: {
-            scales: {
-                y: { min: 0.90, max: 1.01, title: { display: true, text: "F1-Score" } }
-            },
-            plugins: { legend: { display: false } }
+        {
+          label: "Feature Missing (Mean-Imputed)",
+          data: Object.values(robustnessData.missing_feature).map(v => v * 100),
+          backgroundColor: "#B7791F"
         }
-    });
+      ]
+    },
+    options: {
+      scales: {
+        y: { title: { display: true, text: "% Predictions Changed" } }
+      }
+    }
+  });
 
-    // 4. Render Robustness & Feature Perturbation Chart
-    renderChart("c-rb", {
-        type: "bar",
-        data: {
-            labels: Object.keys(robustnessData.single_feature).map(k => FIELD_DEFINITIONS[k].label.replace(/ \(.*/, "")),
-            datasets: [
-                {
-                    label: "Noise on Single Feature",
-                    data: Object.values(robustnessData.single_feature).map(v => v * 100),
-                    backgroundColor: "#174D32"
-                },
-                {
-                    label: "Feature Missing (Mean-Imputed)",
-                    data: Object.values(robustnessData.missing_feature).map(v => v * 100),
-                    backgroundColor: "#B7791F"
-                }
-            ]
-        },
-        options: {
-            scales: {
-                y: { title: { display: true, text: "% Predictions Changed" } }
+  // 5. Global Noise Stability Summary
+  getElement("#rb-all").textContent = Object.entries(robustnessData.all_features)
+    .map(([level, val]) => `${level} noise → ${(val * 100).toFixed(1)}% prediction change`)
+    .join(" · ");
+
+  // 6. Decision Tree Human-Readable Surrogate Rules
+  getElement("#rules").textContent = decisionRules.rules;
+};
+
+// ----------------------------------------------------------------------------
+// 4.12 7-Day Weather Forecast (Open-Meteo)
+// ----------------------------------------------------------------------------
+pageControllers.weather = function () {
+    const formElement = getElement("#form");
+    const cityInput = getElement("#city");
+    const submitButton = getElement("#go");
+    const resultContainer = getElement("#result");
+    const suggestionsBox = getElement("#city-suggestions");
+
+    if (!formElement || !cityInput || !resultContainer) return;
+
+    function escapeHtml(text) {
+        return String(text ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function formatValue(value, fallback = "–") {
+        return value === null || value === undefined ? fallback : value;
+    }
+
+    // ---- Live city / district / state autocomplete ----
+    let suggestTimer = null;
+    let latestSuggestId = 0;
+    let currentSuggestions = [];
+    let activeSuggestionIndex = -1;
+
+    function hideSuggestions() {
+        if (!suggestionsBox) return;
+        suggestionsBox.hidden = true;
+        suggestionsBox.innerHTML = "";
+        currentSuggestions = [];
+        activeSuggestionIndex = -1;
+    }
+
+    function selectSuggestion(item) {
+        cityInput.value = item.value;
+        hideSuggestions();
+        cityInput.focus();
+    }
+
+    function renderSuggestions(items) {
+        if (!suggestionsBox) return;
+        currentSuggestions = items;
+        activeSuggestionIndex = -1;
+
+        if (!items.length) {
+            hideSuggestions();
+            return;
+        }
+
+        suggestionsBox.innerHTML = items.map((item, idx) => `
+            <li class="ac-item" role="option" data-index="${idx}">
+                <i class="fa-solid fa-location-dot" style="color:var(--fresh);margin-right:6px"></i>${escapeHtml(item.label)}
+            </li>
+        `).join("");
+        suggestionsBox.hidden = false;
+    }
+
+    function updateActiveSuggestion() {
+        if (!suggestionsBox) return;
+        getAllElements(".ac-item", suggestionsBox).forEach((el, idx) => {
+            el.classList.toggle("active", idx === activeSuggestionIndex);
+        });
+    }
+
+    if (suggestionsBox) {
+        cityInput.addEventListener("input", () => {
+            const query = cityInput.value.trim();
+            clearTimeout(suggestTimer);
+
+            if (query.length < 2) {
+                hideSuggestions();
+                return;
             }
-        }
-    });
 
-    // 5. Global Noise Stability Summary
-    getElement("#rb-all").textContent = Object.entries(robustnessData.all_features)
-        .map(([level, val]) => `${level} noise → ${(val * 100).toFixed(1)}% prediction change`)
-        .join(" · ");
+            suggestTimer = setTimeout(async () => {
+                const requestId = ++latestSuggestId;
+                try {
+                    const data = await fetchApi(`/weather/suggest?q=${encodeURIComponent(query)}`);
+                    if (requestId !== latestSuggestId) return;
+                    renderSuggestions(data.suggestions || []);
+                } catch {
+                    if (requestId === latestSuggestId) hideSuggestions();
+                }
+            }, 250);
+        });
 
-    // 6. Decision Tree Human-Readable Surrogate Rules
-    getElement("#rules").textContent = decisionRules.rules;
+        // Use mousedown so clicking a suggestion works before input blur
+        suggestionsBox.addEventListener("mousedown", event => {
+            const itemEl = event.target.closest(".ac-item");
+            if (!itemEl) return;
+            event.preventDefault();
+            const idx = parseInt(itemEl.dataset.index, 10);
+            if (!isNaN(idx) && currentSuggestions[idx]) {
+                selectSuggestion(currentSuggestions[idx]);
+            }
+        });
+
+        // Keyboard navigation (ArrowDown, ArrowUp, Enter, Escape)
+        cityInput.addEventListener("keydown", event => {
+            if (suggestionsBox.hidden || !currentSuggestions.length) return;
+
+            if (event.key === "ArrowDown") {
+                event.preventDefault();
+                activeSuggestionIndex = (activeSuggestionIndex + 1) % currentSuggestions.length;
+                updateActiveSuggestion();
+            } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                activeSuggestionIndex = (activeSuggestionIndex - 1 + currentSuggestions.length) % currentSuggestions.length;
+                updateActiveSuggestion();
+            } else if (event.key === "Enter" && activeSuggestionIndex >= 0) {
+                event.preventDefault();
+                selectSuggestion(currentSuggestions[activeSuggestionIndex]);
+            } else if (event.key === "Escape") {
+                hideSuggestions();
+            }
+        });
+
+        document.addEventListener("click", event => {
+            if (!event.target.closest(".city-ac")) {
+                hideSuggestions();
+            }
+        });
+    }
+
+    // ---- Fetch and render 7-day forecast ----
+    formElement.onsubmit = function (event) {
+        event.preventDefault();
+        hideSuggestions();
+
+        executeWithLoadingState(submitButton, async function () {
+            const city = cityInput.value.trim();
+            if (!city) {
+                throw new Error("Please enter a city, district, or state name.");
+            }
+
+            // Show a clear loading message while fetching live forecast data
+            resultContainer.innerHTML = `
+                <div class="panel">
+                    ${renderEmptyPlaceholder("fa-spinner fa-spin", `Loading 7-day weather forecast for ${escapeHtml(city)}...`)}
+                </div>
+            `;
+
+            const url = `/weather?city=${encodeURIComponent(city)}`;
+            const forecast = await fetchApi(url);
+
+            const locationParts = [forecast.location];
+            if (forecast.state && forecast.state.toLowerCase() !== String(forecast.location || "").toLowerCase()) {
+                locationParts.push(forecast.state);
+            }
+            if (forecast.country) {
+                locationParts.push(forecast.country);
+            }
+            const locationLabel = locationParts.filter(Boolean).join(", ");
+
+            const rowsHtml = (forecast.days || []).map(day => `
+                <tr>
+                    <td><b>${escapeHtml(day.date)}</b></td>
+                    <td>${formatValue(day.min_temp_c)}</td>
+                    <td>${formatValue(day.max_temp_c)}</td>
+                    <td>${formatValue(day.humidity_percent)}%</td>
+                    <td>${formatValue(day.rain_mm)}</td>
+                    <td>${formatValue(day.rain_probability)}%</td>
+                </tr>
+            `).join("");
+
+            resultContainer.innerHTML = `
+                <div class="panel">
+                    <div class="inl" style="justify-content:space-between;align-items:center">
+                        <h3 style="margin:0"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(locationLabel)}</h3>
+                        ${renderBadge("live", `Source: ${escapeHtml(forecast.source)}`)}
+                    </div>
+                </div>
+
+                <div class="panel tw">
+                    <h3><i class="fa-solid fa-calendar-week"></i> 7-Day Forecast</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Min Temperature (°C)</th>
+                                <th>Max Temperature (°C)</th>
+                                <th>Humidity (%)</th>
+                                <th>Rainfall (mm)</th>
+                                <th>Rain Probability (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                    <div class="note">${escapeHtml(forecast.note)}</div>
+                </div>
+            `;
+        });
+    };
 };
 
 
@@ -1496,7 +1698,7 @@ pageControllers.model_performance = async function () {
 // 5. APPLICATION BOOTSTRAPPER
 // ============================================================================
 
-document.addEventListener("DOMContentLoaded", () => {
+function initApp() {
     // Mobile navigation burger menu toggle
     const burgerButton = getElement(".burger");
     if (burgerButton) {
@@ -1524,4 +1726,10 @@ document.addEventListener("DOMContentLoaded", () => {
             showToast(err.message, "error");
         });
     }
-});
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initApp);
+} else {
+    initApp();
+}
