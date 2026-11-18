@@ -611,13 +611,13 @@ function displayRecommendationResult(result) {
                     <canvas id="c-top"></canvas>
                 </div>
             </div>
-            <div class="panel">
-                <h3><i class="fa-solid fa-magnifying-glass-chart"></i> What Drove This Prediction</h3>
+            <div class="panel" id="soil-analysis-panel">
+                <h3><i class="fa-solid fa-magnifying-glass-chart"></i> Soil Analysis</h3>
                 <div class="chart-box" style="height:260px">
                     <canvas id="c-exp"></canvas>
                 </div>
                 <div class="note">
-                    Positive values push towards ${capitalizeFirstLetter(topCrop.crop)}. Feature effect estimated via model-agnostic random permutation occlusion.
+                    Positive values support ${capitalizeFirstLetter(topCrop.crop)} in the model; this is not a causal soil or fertilizer recommendation.
                 </div>
             </div>
         `;
@@ -652,6 +652,13 @@ function displayRecommendationResult(result) {
     `;
 
     getElement("#result").innerHTML = htmlContent;
+
+    // Opening Soil Analysis should visibly open that feature, even when its
+    // translated label differs. Routing and mode use stable identifiers.
+    if (document.body.dataset.analysisMode === "soil") {
+        const analysisPanel = getElement("#soil-analysis-panel");
+        if (analysisPanel) getElement("#result").prepend(analysisPanel);
+    }
 
     // Render Charts if recommendation was valid
     if (status !== "OUT_OF_RANGE") {
@@ -1393,11 +1400,12 @@ pageControllers.rotation = async function () {
 // ----------------------------------------------------------------------------
 pageControllers.model_performance = async function () {
     // Fetch metrics, class-wise F1, robustness tests, and surrogate tree rules in parallel
-    const [metrics, classwiseMetrics, robustnessData, decisionRules] = await Promise.all([
+    const [metrics, classwiseMetrics, robustnessData, decisionRules, confusion] = await Promise.all([
         fetchApi("/metrics"),
         fetchApi("/metrics/classwise"),
         fetchApi("/metrics/robustness"),
-        fetchApi("/metrics/decision-rules")
+        fetchApi("/metrics/decision-rules"),
+        fetchApi("/metrics/confusion-matrix")
     ]);
 
     // 1. Display Selected Model & Tie-Break Logic
@@ -1492,6 +1500,27 @@ pageControllers.model_performance = async function () {
 
     // 6. Decision Tree Human-Readable Surrogate Rules
     getElement("#rules").textContent = decisionRules.rules;
+
+    // Live labels can be translated; text baked into PNG plots cannot.
+    renderChart('c-comparison', {
+        type:'bar',data:{labels:metrics.comparison.map(row=>row.Model),datasets:[
+            {label:'CV Accuracy',data:metrics.comparison.map(row=>row['CV Accuracy']*100),backgroundColor:'#4C956C'},
+            {label:'Test Accuracy',data:metrics.comparison.map(row=>row['Test Accuracy']*100),backgroundColor:'#174D32'}
+        ]},options:{scales:{y:{max:100,title:{display:true,text:'Accuracy (%)'}}}}
+    });
+    const matrix=document.createElement('table');
+    const heading=document.createElement('tr');
+    for(const value of ['Actual / Predicted',...confusion.classes.map(capitalizeFirstLetter)]){
+        const cell=document.createElement('th');cell.textContent=value;heading.appendChild(cell);
+    }
+    matrix.appendChild(heading);
+    confusion.matrix.forEach((values,index)=>{
+        const row=document.createElement('tr');
+        const label=document.createElement('th');label.textContent=capitalizeFirstLetter(confusion.classes[index]);row.appendChild(label);
+        values.forEach((value,column)=>{const cell=document.createElement('td');cell.textContent=value;if(index===column)cell.style.background='#DCECCB';row.appendChild(cell);});
+        matrix.appendChild(row);
+    });
+    getElement('#confusion-table').replaceChildren(matrix);
 };
 
 
@@ -1505,7 +1534,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (burgerButton) {
         burgerButton.addEventListener("click", () => {
             const menu = getElement(".menu");
-            if (menu) menu.classList.toggle("open");
+            if (menu) {
+                const expanded=menu.classList.toggle("open");
+                burgerButton.setAttribute('aria-expanded',String(expanded));
+            }
         });
     }
 
@@ -1513,9 +1545,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const dropdownButtons = getAllElements(".dd > button");
     dropdownButtons.forEach(btn => {
         btn.addEventListener("click", event => {
-            event.currentTarget.parentElement.classList.toggle("open");
+            const expanded=event.currentTarget.parentElement.classList.toggle("open");
+            event.currentTarget.setAttribute('aria-expanded',String(expanded));
         });
     });
+
+    function closeNavigation(){
+        getElement('.menu')?.classList.remove('open');
+        burgerButton?.setAttribute('aria-expanded','false');
+        getAllElements('.dd').forEach(item=>item.classList.remove('open'));
+        dropdownButtons.forEach(button=>button.setAttribute('aria-expanded','false'));
+    }
+    document.addEventListener('languagechange',closeNavigation);
+    document.addEventListener('keydown',event=>{if(event.key==='Escape')closeNavigation();});
+    getAllElements('.menu a').forEach(link=>link.addEventListener('click',closeNavigation));
+    document.addEventListener('click',event=>{if(!event.target.closest('.nav'))closeNavigation();});
+    const nav=getElement('.nav');
+    if(nav&&window.ResizeObserver){
+        new ResizeObserver(()=>document.documentElement.style.setProperty('--navigation-height',nav.getBoundingClientRect().height+'px')).observe(nav);
+    }
 
     // Initialize controller matching the current page's data-page attribute
     const currentPageName = document.body.dataset.page;

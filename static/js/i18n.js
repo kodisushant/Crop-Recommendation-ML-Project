@@ -18,10 +18,20 @@
         'NOT_SUITABLE':'NOT SUITABLE',
         'Why confidence is not high:':'LOW CONFIDENCE',
         'Soil nitrogen content':'Nitrogen','Soil phosphorus content':'Phosphorus',
-        'Soil potassium content':'Potassium','Average temperature':'Temperature','Relative humidity':'Humidity'
+        'Soil potassium content':'Potassium','Average temperature':'Temperature','Relative humidity':'Humidity',
+        'Soil nitrogen':'Nitrogen','Soil phosphorus':'Phosphorus','Soil potassium':'Potassium',
+        'Acidity':'Soil pH','Previous crop':'Last crop grown',
+        'Selected Production Model':'Production model','Best production model':'Production model',
+        'crops supported':'Supported crops','production model':'Production model',
+        'Estimated Fertilizer Cost':'Estimated cost','Total Cultivation Cost':'Total Cost',
+        'Modal Price':'Modal (Typical)','Min':'Min Price','Max':'Max Price',
+        'REFERENCE PRICE (not live)':'Reference price','LIVE MANDI PRICES':'Live price',
+        'What Drove This Prediction':'Explanation','Suitability score for':'Land Suitability',
+        'Model\'s top recommendation for this land:':'Recommended crop',
+        'Probability score for':'Model probability','Reference Price per Quintal':'Reference price'
     };
     const features={N:'Nitrogen',P:'Phosphorus',K:'Potassium',ph:'Soil pH',temperature:'Temperature',humidity:'Humidity',rainfall:'Rainfall'};
-    const skip='script,style,canvas,pre,code,[translate="no"],#language-select';
+    const skip='script,style,canvas,code,[translate="no"],#language-select';
     const originals=new WeakMap(),attributes=new WeakMap(),chartSources=new WeakMap(),charts=new Set();
     let language='en', observer=null;
     const originalTitle=typeof document.title==='string'?document.title:'';
@@ -30,6 +40,12 @@
     Object.entries(vocabulary.catalogs).forEach(([code,values])=>{
         lowerIndexes[code]=Object.fromEntries(Object.entries(values).map(([key,value])=>[key.toLowerCase(),value]));
     });
+    // Only known message templates are matched. Values are inserted as text,
+    // never HTML, and are not sent to a provider or used to change API payloads.
+    const messagePatterns=(vocabulary.messageTemplates||[]).map(template=>({
+        template,
+        regex:new RegExp('^'+template.split(/\{\d+\}/).map(part=>part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('(.+?)')+'$')
+    }));
     function translate(text, code=language) {
         if(code==='en'||!vocabulary.catalogs[code]||typeof text!=='string')return text;
         const leading=text.match(/^\s*/)[0], trailing=text.match(/\s*$/)[0];
@@ -38,6 +54,12 @@
         const key=aliases[source]||source;
         const dict=vocabulary.catalogs[code];
         let result=dict[key]||lowerIndexes[code][key.toLowerCase()];
+        if(!result){
+            for(const {template,regex} of messagePatterns){
+                const match=source.match(regex);
+                if(match){result=dict[template].replace(/\{(\d+)\}/g,(_,index)=>translate(features[match[Number(index)+1]]||match[Number(index)+1],code));break;}
+            }
+        }
         if(!result){
             const feature=source.match(/^(N|P|K|ph|temperature|humidity|rainfall)(\s*=\s*[-\d.]+)$/);
             const range=source.match(/^Enter between ([\d.-]+) and ([\d.-]+)$/);
@@ -51,6 +73,17 @@
             else if(source.endsWith(' (%)'))result=translate(source.slice(0,-4),code)+' (%)';
             else if(source==='Probability')result=translate('Model probability',code);
             else if(source==='Confidence:')result=translate('Confidence',code)+':';
+            else if(source.endsWith(':'))result=translate(source.slice(0,-1),code)+':';
+            else if(source==='Select crop…')result=translate('Select crop',code)+'…';
+            else if(/^\([^()]+\)$/.test(source))result='('+translate(source.slice(1,-1),code)+')';
+            else if(/^Total (Urea|DAP|MOP)$/.test(source))result=translate('Total',code)+' '+translate(source.slice(6),code);
+            else if(/^\d+ days$/.test(source))result=source.replace('days',translate('days',code));
+            else if(source.includes(', ')&&source.split(', ').every(part=>dict[part]))result=source.split(', ').map(part=>translate(part,code)).join(', ');
+            else {
+                // Keep standard unit notation intact while translating the label.
+                const labelled=source.match(/^(.+?)(\s+\([^()]+\))$/);
+                if(labelled&&translate(labelled[1],code)!==labelled[1])result=translate(labelled[1],code)+labelled[2];
+            }
         }
         return result?leading+result+trailing:text;
     }
@@ -79,7 +112,15 @@
         attributes.set(element,saved);
     }
     function translateTree(root) {
-        if(root.nodeType===3){if(!root.parentElement?.closest(skip))rememberAndTranslate(root);return;}
+        if(root.nodeType===3){
+            if(!root.parentElement?.closest(skip)){
+                // A label may be replaced asynchronously on an existing option.
+                // Save its machine value before translating that text node too.
+                if(root.parentElement)translateElement(root.parentElement);
+                rememberAndTranslate(root);
+            }
+            return;
+        }
         if(root.nodeType!==1||root.closest(skip))return;
         translateElement(root);
         const walker=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);
@@ -88,7 +129,7 @@
             else if(!node.parentElement?.closest(skip))rememberAndTranslate(node);
         }
     }
-    function observe(){observer.observe(document.body,{childList:true,subtree:true,characterData:true});}
+    function observe(){observer.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['placeholder','title','aria-label','alt']});}
     function apply(root=document.body){
         observer?.disconnect();
         translateTree(root);
@@ -117,11 +158,11 @@
         notice.hidden=language==='en';
         notice.textContent=translate('Some detailed technical notes are shown in English.');
         apply();
-        charts.forEach(chart=>{if(chart.canvas?.isConnected)localizeChart(chart);else charts.delete(chart);});
+        charts.forEach(chart=>{if(chart.canvas?.isConnected){try{localizeChart(chart);}catch(error){console.warn('Chart translation skipped',error);}}else charts.delete(chart);});
         document.dispatchEvent(new CustomEvent('languagechange',{detail:{language}}));
     }
     global.CropI18n={t:translate,setLanguage,apply,get language(){return language;},
-        registerChart(chart){charts.add(chart);localizeChart(chart);}};
+        registerChart(chart){charts.add(chart);try{localizeChart(chart);}catch(error){console.warn('Chart translation skipped',error);}}};
     document.addEventListener('DOMContentLoaded',()=>{
         const select=document.getElementById('language-select');
         vocabulary.languages.forEach(([code,name])=>{const option=document.createElement('option');option.value=code;option.textContent=name;option.lang=code;select.appendChild(option);});
@@ -131,7 +172,7 @@
             // Mutation callbacks include asynchronously inserted results, errors,
             // dropdown options and toasts. Never replace elements or event handlers.
             const roots=new Set();records.forEach(record=>{
-                if(record.type==='characterData')roots.add(record.target);
+                if(record.type==='characterData'||record.type==='attributes')roots.add(record.target);
                 else record.addedNodes.forEach(node=>roots.add(node));
             });
             roots.forEach(root=>{if(root.isConnected)translateTree(root);});

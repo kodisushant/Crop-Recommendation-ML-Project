@@ -16,10 +16,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <!-- Custom Stylesheet -->
-    <link rel="stylesheet" href="/static/css/style.css?v=i18n1">
+    <link rel="stylesheet" href="/static/css/style.css?v=i18n2">
 </head>
 
-<body data-page="{{ page }}">
+<body data-page="{{ page }}" data-analysis-mode="{{ 'soil' if soil_analysis else 'crop' }}">
     <!-- Navigation Bar -->
     <header class="nav">
         <div class="wrap">
@@ -28,7 +28,7 @@
                 CROP ADVISOR
             </a>
             
-            <button class="burger" aria-label="Toggle navigation menu">
+            <button class="burger" type="button" aria-label="Toggle navigation menu" aria-controls="main-menu" aria-expanded="false">
                 <i class="fa-solid fa-bars"></i>
             </button>
 
@@ -37,7 +37,7 @@
                 <select id="language-select" translate="no"></select>
             </div>
             
-            <ul class="menu">
+            <ul class="menu" id="main-menu">
                 {% block links %}
                 <li><a href="/">Home</a></li>
                 <li><a href="/dashboard">Dashboard</a></li>
@@ -45,10 +45,11 @@
                 
                 <!-- Tools Dropdown -->
                 <li class="dd">
-                    <button type="button">
+                    <button type="button" aria-expanded="false" aria-controls="tools-menu">
                         Tools <i class="fa-solid fa-chevron-down"></i>
                     </button>
-                    <div class="dd-m">
+                    <div class="dd-m" id="tools-menu">
+                        <a href="/soil-analysis"><i class="fa-solid fa-vial"></i> Soil Analysis</a>
                         <a href="/ideal-conditions"><i class="fa-solid fa-ruler-combined"></i> Ideal Conditions</a>
                         <a href="/land-check"><i class="fa-solid fa-map"></i> Land Suitability</a>
                         <a href="/fertilizer"><i class="fa-solid fa-flask"></i> Fertilizer Planning</a>
@@ -110,8 +111,12 @@
     <!-- JavaScript Dependencies -->
     <script src="/static/js/chart.umd.js"></script>
     <script src="/static/js/translations.js?v=1"></script>
-    <script src="/static/js/i18n.js?v=1"></script>
-    <script src="/static/js/script.js?v=i18n1"></script>
+    <script src="/static/js/translations-complete.js?v=1"></script>
+    <script src="/static/js/translations-reports.js?v=1"></script>
+    <script src="/static/js/translations-messages.js?v=soil-analysis1"></script>
+    <script src="/static/js/translations-descriptions.js?v=1"></script>
+    <script src="/static/js/i18n.js?v=offline3"></script>
+    <script src="/static/js/script.js?v=soil-analysis1"></script>
 </body>
 
 </html>

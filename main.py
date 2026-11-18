@@ -112,6 +112,12 @@ def _page(name):
 for path, name in PAGES.items():
     app.add_api_route("/" + path, _page(name), methods=["GET"], include_in_schema=False)
 
+@app.get("/soil-analysis", include_in_schema=False)
+def soil_analysis(request: Request):
+    # Reuse the existing inputs and model; only the presentation changes.
+    return templates.TemplateResponse(request, "recommendation.html",
+                                      {"page": "recommendation", "soil_analysis": True})
+
 @app.get("/health", include_in_schema=False)
 def health(): return {"status": "ok"}
 

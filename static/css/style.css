@@ -940,3 +940,18 @@ html[dir="rtl"] table { text-align:right; }
         transition: none !important;
     }
 }
+
+/* Translated labels can wrap the header. Position menus below its actual
+   height rather than the original English-only 64px assumption. */
+.card { overflow-wrap:anywhere; }
+.dd-m a { white-space:normal; overflow-wrap:anywhere; }
+@media(max-width:1100px){
+    .nav .wrap{flex-wrap:wrap;height:auto;min-height:64px;}
+    .burger{display:block;order:3;}
+    .menu{display:none;position:absolute;top:100%;inset-inline:0;background:var(--white);flex-direction:column;align-items:stretch;padding:12px;max-height:calc(100dvh - var(--navigation-height,80px));overflow-y:auto;border-bottom:1px solid var(--line);}
+    .menu.open{display:flex;}
+    .dd-m{position:static;display:none;box-shadow:none;border:0;padding-inline-start:12px;}
+    .dd.open .dd-m{display:block;}
+    .dd>button{display:block;width:100%;text-align:start;}
+    .language-picker{margin-inline-start:auto;order:2;}
+}

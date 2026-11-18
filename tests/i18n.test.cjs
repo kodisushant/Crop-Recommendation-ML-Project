@@ -9,7 +9,7 @@ const root=path.resolve(__dirname,'..');
 function runtime(saved='en'){
     const context={window:{},localStorage:{getItem:()=>saved},document:{addEventListener(){}},console};
     vm.createContext(context);
-    for(const name of ['translations.js','i18n.js'])vm.runInContext(fs.readFileSync(path.join(root,'static/js',name),'utf8'),context);
+    for(const name of ['translations.js','translations-complete.js','translations-reports.js','translations-messages.js','translations-descriptions.js','i18n.js'])vm.runInContext(fs.readFileSync(path.join(root,'static/js',name),'utf8'),context);
     return context.window;
 }
 test('all advertised languages have complete core, crop and safety entries',()=>{
@@ -42,4 +42,16 @@ test('feature values and validation limits survive translation',()=>{
     assert.equal(i18n.t('LOW_CONFIDENCE'),'తక్కువ విశ్వాసం');
     assert.equal(i18n.t(' · Confidence '),' · విశ్వాస స్థాయి ');
     assert.ok(i18n.t("Probability is the model's score on this dataset, not a guarantee of agricultural success. Technical detail.").startsWith('సంభావ్యత'));
+});
+
+test('parameterized safety messages translate without changing limits or measurements',()=>{
+    const app=runtime();
+    for(const [code]of app.CropTranslations.languages){
+        if(code==='en')continue;
+        for(const text of ['Top probability is only 41% (below 50%).','Top two crops are close (margin 12%, below 15%).','N = 350 is outside the training range (0.0–140.0).','Changed in 40 noisy re-runs','Unusualness (limit 17.25)']){
+            const translated=app.CropI18n.t(text,code);
+            assert.notEqual(translated,text,code+': '+text);
+            assert.deepEqual(translated.match(/\d+(?:\.\d+)?/g),text.match(/\d+(?:\.\d+)?/g));
+        }
+    }
 });

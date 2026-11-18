@@ -1,13 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Crop Recommendation{% endblock %}
+{% block title %}{% if soil_analysis %}Soil Analysis{% else %}Crop Recommendation{% endif %}{% endblock %}
 
 {% block body %}
 <!-- Page Header -->
 <div class="app-head">
     <div class="wrap">
-        <h1>Crop Recommendation</h1>
+        <h1>{% if soil_analysis %}Soil Analysis{% else %}Crop Recommendation{% endif %}</h1>
+        {% if soil_analysis %}
+        <p>Enter soil and weather values to see how each input influences the model.</p>
+        {% else %}
         <p>Enter your soil and weather conditions. The trained model returns a crop, its confidence, and an honest warning when the input is unusual.</p>
+        {% endif %}
     </div>
 </div>
 
@@ -119,7 +123,7 @@
                 <div class="inl">
                     <button class="btn" id="go" type="submit">
                         <span class="spinner"></span>
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Recommend crop
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> {% if soil_analysis %}Soil Analysis{% else %}Recommend crop{% endif %}
                     </button>
                     <button type="button" class="btn ghost" id="fill-example">
                         <i class="fa-solid fa-flask-vial"></i> Use example
