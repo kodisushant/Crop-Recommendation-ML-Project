@@ -234,11 +234,14 @@ async function executeWithLoadingState(submitButton, asyncAction) {
         showToast(error.message, "error");
         const resultContainer = getElement("#result");
         if (resultContainer) {
-            resultContainer.innerHTML = `
-                <div class="alert bad">
-                    <b>Something went wrong:</b> ${error.message}
-                </div>
-            `;
+            // Provider errors can contain the location the user typed. Treat
+            // that message as text so it cannot create HTML or event handlers.
+            const alert = document.createElement('div');
+            alert.className = 'alert bad';
+            const heading = document.createElement('b');
+            heading.textContent = 'Something went wrong:';
+            alert.append(heading, document.createTextNode(' ' + error.message));
+            resultContainer.replaceChildren(alert);
         }
     } finally {
         submitButton.classList.remove("loading");
@@ -1543,8 +1546,8 @@ pageControllers.weather = function () {
             .replace(/"/g, "&quot;");
     }
 
-    function formatValue(value, fallback = "–") {
-        return value === null || value === undefined ? fallback : value;
+    function formatValue(value, suffix = "") {
+        return typeof value === "number" && Number.isFinite(value) ? String(value) + suffix : "–";
     }
 
     // ---- Live city / district / state autocomplete ----
@@ -1554,8 +1557,12 @@ pageControllers.weather = function () {
     let activeSuggestionIndex = -1;
 
     function hideSuggestions() {
+        // Invalidate any older response, including when a query is cleared.
+        latestSuggestId++;
         if (!suggestionsBox) return;
         suggestionsBox.hidden = true;
+        cityInput.setAttribute('aria-expanded','false');
+        cityInput.removeAttribute('aria-activedescendant');
         suggestionsBox.innerHTML = "";
         currentSuggestions = [];
         activeSuggestionIndex = -1;
@@ -1578,24 +1585,28 @@ pageControllers.weather = function () {
         }
 
         suggestionsBox.innerHTML = items.map((item, idx) => `
-            <li class="ac-item" role="option" data-index="${idx}">
-                <i class="fa-solid fa-location-dot" style="color:var(--fresh);margin-right:6px"></i>${escapeHtml(item.label)}
+            <li class="ac-item" role="option" id="weather-suggestion-${idx}" aria-selected="false" data-index="${idx}">
+                <i class="fa-solid fa-location-dot" aria-hidden="true"></i><span translate="no">${escapeHtml(item.label)}</span>
             </li>
         `).join("");
         suggestionsBox.hidden = false;
+        cityInput.setAttribute('aria-expanded','true');
     }
 
     function updateActiveSuggestion() {
         if (!suggestionsBox) return;
         getAllElements(".ac-item", suggestionsBox).forEach((el, idx) => {
             el.classList.toggle("active", idx === activeSuggestionIndex);
+            el.setAttribute('aria-selected',String(idx === activeSuggestionIndex));
         });
+        if(activeSuggestionIndex>=0)cityInput.setAttribute('aria-activedescendant',`weather-suggestion-${activeSuggestionIndex}`);
     }
 
     if (suggestionsBox) {
         cityInput.addEventListener("input", () => {
             const query = cityInput.value.trim();
             clearTimeout(suggestTimer);
+            const requestId = ++latestSuggestId;
 
             if (query.length < 2) {
                 hideSuggestions();
@@ -1603,7 +1614,6 @@ pageControllers.weather = function () {
             }
 
             suggestTimer = setTimeout(async () => {
-                const requestId = ++latestSuggestId;
                 try {
                     const data = await fetchApi(`/weather/suggest?q=${encodeURIComponent(query)}`);
                     if (requestId !== latestSuggestId) return;
@@ -1652,27 +1662,21 @@ pageControllers.weather = function () {
         });
     }
 
-    // ---- Fetch and render 7-day forecast ----
-    formElement.onsubmit = function (event) {
-        event.preventDefault();
-        hideSuggestions();
-
-        executeWithLoadingState(submitButton, async function () {
-            const city = cityInput.value.trim();
-            if (!city) {
-                throw new Error("Please enter a city, district, or state name.");
+    // Keep the response locally so changing language can refresh date labels
+    // without another weather request or changing the typed city name.
+    let lastForecast = null;
+    function formatForecastDate(value) {
+        const date=new Date(String(value)+'T12:00:00Z');
+        if(Number.isNaN(date.getTime()))return String(value);
+        return new Intl.DateTimeFormat(window.CropI18n?.language || 'en', {
+            weekday:'short',day:'numeric',month:'short',timeZone:'UTC'
+        }).format(date);
+    }
+    function renderForecast(forecast) {
+            if (!forecast.days?.length) {
+                resultContainer.innerHTML = `<div class="panel">${renderEmptyPlaceholder('fa-cloud-sun','No forecast data is available for this location.')}</div>`;
+                return;
             }
-
-            // Show a clear loading message while fetching live forecast data
-            resultContainer.innerHTML = `
-                <div class="panel">
-                    ${renderEmptyPlaceholder("fa-spinner fa-spin", `Loading 7-day weather forecast for ${escapeHtml(city)}...`)}
-                </div>
-            `;
-
-            const url = `/weather?city=${encodeURIComponent(city)}`;
-            const forecast = await fetchApi(url);
-
             const locationParts = [forecast.location];
             if (forecast.state && forecast.state.toLowerCase() !== String(forecast.location || "").toLowerCase()) {
                 locationParts.push(forecast.state);
@@ -1684,20 +1688,20 @@ pageControllers.weather = function () {
 
             const rowsHtml = (forecast.days || []).map(day => `
                 <tr>
-                    <td><b>${escapeHtml(day.date)}</b></td>
+                    <td><time datetime="${escapeHtml(day.date)}" title="${escapeHtml(day.date)}">${escapeHtml(formatForecastDate(day.date))}</time></td>
                     <td>${formatValue(day.min_temp_c)}</td>
                     <td>${formatValue(day.max_temp_c)}</td>
-                    <td>${formatValue(day.humidity_percent)}%</td>
+                    <td>${formatValue(day.humidity_percent, '%')}</td>
                     <td>${formatValue(day.rain_mm)}</td>
-                    <td>${formatValue(day.rain_probability)}%</td>
+                    <td>${formatValue(day.rain_probability, '%')}</td>
                 </tr>
             `).join("");
 
             resultContainer.innerHTML = `
                 <div class="panel">
                     <div class="inl" style="justify-content:space-between;align-items:center">
-                        <h3 style="margin:0"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(locationLabel)}</h3>
-                        ${renderBadge("live", `Source: ${escapeHtml(forecast.source)}`)}
+                        <h3 style="margin:0"><i class="fa-solid fa-location-dot"></i> <span translate="no">${escapeHtml(locationLabel)}</span></h3>
+                        ${renderBadge("live", `<span>Source</span>: <span translate="no">${escapeHtml(forecast.source)}</span>`)}
                     </div>
                 </div>
 
@@ -1721,6 +1725,26 @@ pageControllers.weather = function () {
                     <div class="note">${escapeHtml(forecast.note)}</div>
                 </div>
             `;
+    }
+    document.addEventListener('languagechange', () => {
+        if(lastForecast)renderForecast(lastForecast);
+    });
+
+    // ---- Fetch and render 7-day forecast ----
+    formElement.onsubmit = function (event) {
+        event.preventDefault();
+        hideSuggestions();
+        lastForecast = null;
+        executeWithLoadingState(submitButton, async function () {
+            const city = cityInput.value.trim();
+            if (!city) throw new Error('Please enter a city, district, or state name.');
+            resultContainer.innerHTML = `
+                <div class="panel">
+                    ${renderEmptyPlaceholder('fa-spinner fa-spin','<span>Loading 7-day weather forecast...</span>')}
+                    <p translate="no">${escapeHtml(city)}</p>
+                </div>`;
+            lastForecast = await fetchApi(`/weather?city=${encodeURIComponent(city)}`);
+            renderForecast(lastForecast);
         });
     };
 };

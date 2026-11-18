@@ -57,7 +57,13 @@
         if(!result){
             for(const {template,regex} of messagePatterns){
                 const match=source.match(regex);
-                if(match){result=dict[template].replace(/\{(\d+)\}/g,(_,index)=>translate(features[match[Number(index)+1]]||match[Number(index)+1],code));break;}
+                if(match){
+                    result=dict[template].replace(/\{(\d+)\}/g,(_,index)=>{
+                        const value=match[Number(index)+1];
+                        return vocabulary.literalMessageTemplates?.includes(template)?value:translate(features[value]||value,code);
+                    });
+                    break;
+                }
             }
         }
         if(!result){

@@ -7,8 +7,6 @@
 <div class="app-head">
     <div class="wrap">
         <h1>7-Day Weather Forecast</h1>
-        <p>Check the upcoming 7-day temperature and rainfall forecast for any city or town using live Open-Meteo weather
-            data.</p>
         <p>Check the upcoming 7-day temperature, humidity, and rainfall forecast for any city, district, or state using
             live Open-Meteo weather data.</p>
     </div>
@@ -21,8 +19,8 @@
         <form id="form" class="panel inl" novalidate>
             <div class="city-ac">
                 <label for="city">City, District, or State</label>
-                <input type="text" id="city" name="city" value="Hyderabad" autocomplete="off" placeholder="e.g. Hyderabad, Telangana, East Godavari" required>
-                <ul id="city-suggestions" class="ac-list" role="listbox" hidden></ul>
+                <input type="text" id="city" name="city" value="Hyderabad" autocomplete="off" placeholder="e.g. Hyderabad, Telangana, East Godavari" role="combobox" aria-autocomplete="list" aria-controls="city-suggestions" aria-expanded="false" required>
+                <ul id="city-suggestions" class="ac-list" role="listbox" aria-label="Location suggestions" hidden></ul>
             </div>
 
                 <button class="btn" id="go" type="submit">
@@ -32,7 +30,7 @@
         </form>
 
         <!-- Forecast Results Container -->
-        <div id="result">
+        <div id="result" aria-live="polite">
             <div class="panel">
                 <div class="empty">
                     <i class="fa-solid fa-cloud-sun"></i>Enter a city, district, or state and click Get Forecast to see the 7-day weather outlook.

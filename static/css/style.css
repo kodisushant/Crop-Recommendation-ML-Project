@@ -568,7 +568,7 @@ input.bad {
 
 .city-ac {
     position: relative;
-    min-width: 280px;
+    min-width: 0;
     flex: 1 1 280px;
     max-width: 420px;
 }
@@ -597,6 +597,9 @@ input.bad {
     font-size: 0.92rem;
     color: var(--text);
 }
+
+.city-ac input { min-width:0; }
+html[dir="rtl"] .ac-item i { margin-inline-end:6px; }
 
 .ac-item:hover,
 .ac-item.active {

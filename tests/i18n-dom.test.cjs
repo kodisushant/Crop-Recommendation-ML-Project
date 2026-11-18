@@ -29,14 +29,15 @@ async function page(name='rotation',saved='en',responses={}){
         const data=responses[url]??({'/crops':[crop],'/crops/rice':crop,'/states':['Telangana'],
             '/rotation':{suggestions:[],disclaimer:''},'/meta':{n_crops:22,test_accuracy:0.99,best_model:'Random Forest'}}[url]);
         assert.notEqual(data,undefined,'unmocked API: '+url);
-        return {ok:true,json:async()=>data};
+        const result=typeof data==='function'?await data(url,options):data;
+        return result.__http || {ok:true,json:async()=>result};
     };
     // Charts are exercised separately. Canvas rendering needs a real browser.
     w.Chart=class {constructor(canvas,config){this.canvas=canvas;this.data=config.data;this.options=config.options||{};}update(){}destroy(){}};
     w.HTMLElement.prototype.scrollIntoView=function(){};
     // Wait for jsdom's own DOMContentLoaded before installing application scripts.
     await tick();
-    for(const file of ['translations','translations-complete','translations-reports','translations-messages','translations-descriptions','i18n','script'])w.eval(read(`static/js/${file}.js`));
+    for(const file of ['translations','translations-complete','translations-reports','translations-messages','translations-descriptions','translations-weather','i18n','script'])w.eval(read(`static/js/${file}.js`));
     w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
     await tick();
     return {dom,w,requests,errors};
@@ -200,5 +201,143 @@ test('soil mode keeps the analysis visible when language changes after a predict
         await tick();assert.equal(d.querySelector('#soil-analysis-panel'),null);
         assert.ok(d.querySelector('#result .alert.bad'));
         assert.deepEqual(errors,[]);
+    }finally{dom.window.close();}
+});
+
+const weatherFixture={location:'Orange',state:'California',country:'United States',source:'Open-Meteo',
+    note:'Forecast is approximate. Check local weather alerts before farm operations.',
+    days:Array.from({length:7},(_,index)=>({date:`2026-11-${19+index}`,min_temp_c:17.5,max_temp_c:29,
+        humidity_percent:index?65:null,rain_mm:1.2,rain_probability:index?30:null}))};
+
+test('weather headings, instructions, home card and controls translate in all advertised languages',async()=>{
+    const {dom,w}=await page('weather');
+    const home=await page('index');
+    try{
+        const d=w.document;
+        const description=d.querySelector('.app-head p').textContent.trim().replace(/\s+/g,' ');
+        const empty=d.querySelector('#result .empty').textContent.trim();
+        const field=d.querySelector('#city'),placeholder=field.placeholder;
+        const card=home.w.document.querySelector('#features a[href="/weather-forecast"]');
+        const homeDescription=card.querySelector('p').textContent;
+        for(const [code]of w.CropTranslations.languages){
+            w.CropI18n.setLanguage(code);home.w.CropI18n.setLanguage(code);await tick();
+            for(const source of ['7-Day Weather Forecast',description,empty,placeholder,'Get Forecast']){
+                const translated=w.CropI18n.t(source);
+                if(code!=='en')assert.notEqual(translated,source,code+': '+source);
+            }
+            assert.equal(d.querySelector('h1').textContent,w.CropI18n.t('7-Day Weather Forecast'));
+            assert.equal(d.querySelector('.app-head p').textContent.trim().replace(/\s+/g,' '),w.CropI18n.t(description));
+            assert.equal(field.placeholder,w.CropI18n.t(placeholder));assert.equal(field.value,'Hyderabad');
+            assert.equal(card.getAttribute('href'),'/weather-forecast');
+            assert.equal(card.querySelector('h3').textContent,home.w.CropI18n.t('7-Day Weather Forecast'));
+            assert.equal(card.querySelector('p').textContent,home.w.CropI18n.t(homeDescription));
+            if(code!=='en')assert.notEqual(card.querySelector('p').textContent,homeDescription);
+        }
+    }finally{dom.window.close();home.dom.window.close();}
+});
+
+test('forecast switches all locales without refetching or changing place names and measurements',async()=>{
+    const {dom,w,requests,errors}=await page('weather','te',{'/weather?city=Orange':weatherFixture});
+    try{
+        const d=w.document,field=d.querySelector('#city');field.value='Orange';
+        d.querySelector('#form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+        for(const [code]of w.CropTranslations.languages){
+            w.CropI18n.setLanguage(code);await tick();
+            assert.equal(d.querySelector('#city'),field);assert.equal(field.value,'Orange');
+            assert.equal(d.querySelectorAll('#result tbody tr').length,7);
+            assert.equal(d.querySelector('#result h3 span').textContent,'Orange, California, United States');
+            const headers=[...d.querySelectorAll('#result th')].map(cell=>cell.textContent);
+            assert.deepEqual(headers,['Date','Min Temperature (°C)','Max Temperature (°C)','Humidity (%)','Rainfall (mm)','Rain Probability (%)'].map(text=>w.CropI18n.t(text)));
+            const cells=[...d.querySelectorAll('#result tbody tr:first-child td')].slice(1).map(cell=>cell.textContent);
+            assert.deepEqual(cells,['17.5','29','–','1.2','–']);
+            assert.equal(d.querySelector('#result time').getAttribute('datetime'),'2026-11-19');
+            assert.equal(d.querySelector('#result time').textContent,new w.Intl.DateTimeFormat(code,{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new w.Date('2026-11-19T12:00:00Z')));
+            assert.equal(d.querySelector('#result .note').textContent,w.CropI18n.t(weatherFixture.note));
+            assert.equal(d.querySelector('#go').disabled,false);
+            assert.equal(d.documentElement.dir,code==='ur'?'rtl':'ltr');
+        }
+        assert.equal(requests.filter(r=>r.url.startsWith('/weather?')).length,1);
+        assert.deepEqual(errors,[]);
+    }finally{dom.window.close();}
+});
+
+test('loading and completed forecasts follow a language switch during a request',async()=>{
+    let finish;
+    const pending=new Promise(resolve=>{finish=resolve;});
+    const {dom,w}=await page('weather','te',{'/weather?city=Hyderabad':()=>pending});
+    try{
+        const d=w.document;
+        d.querySelector('#form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+        assert.equal(d.querySelector('#go').disabled,true);
+        assert.ok(d.querySelector('#result').textContent.includes(w.CropI18n.t('Loading 7-day weather forecast...')));
+        w.CropI18n.setLanguage('ur');await tick();
+        assert.ok(d.querySelector('#result').textContent.includes(w.CropI18n.t('Loading 7-day weather forecast...')));
+        finish(weatherFixture);await tick();
+        assert.equal(d.querySelector('#result th').textContent,w.CropI18n.t('Date'));
+        assert.equal(d.querySelector('#go').disabled,false);
+    }finally{dom.window.close();}
+});
+
+test('weather validation, provider errors and empty forecasts translate and allow retry',async()=>{
+    const responses={'/weather?city=Orange':{__http:{ok:false,json:async()=>({detail:"Location 'Orange' not found. Please check the spelling and try another city, district, or state."})}},
+        '/weather?city=Empty':{...weatherFixture,days:[]}};
+    const {dom,w,requests}=await page('weather','te',responses);
+    try{
+        const d=w.document,field=d.querySelector('#city'),form=d.querySelector('#form');
+        field.value='';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+        assert.ok(d.querySelector('#result').textContent.includes(w.CropI18n.t('Please enter a city, district, or state name.')));
+        assert.equal(requests.length,0);
+        field.value='Orange';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+        const english="Location 'Orange' not found. Please check the spelling and try another city, district, or state.";
+        for(const code of ['te','hi','ur','en']){
+            w.CropI18n.setLanguage(code);await tick();
+            assert.ok(d.querySelector('#result').textContent.includes(w.CropI18n.t(english)));
+            assert.ok(d.querySelector('#result').textContent.includes('Orange'));
+        }
+        field.value='Empty';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+        assert.ok(d.querySelector('#result').textContent.includes(w.CropI18n.t('No forecast data is available for this location.')));
+        assert.equal(d.querySelector('#go').disabled,false);
+    }finally{dom.window.close();}
+});
+
+test('weather suggestions keep canonical values and keyboard selection across language changes',async()=>{
+    const {dom,w,requests}=await page('weather','te',{'/weather/suggest?q=Or':{suggestions:[{label:'Orange, California, United States',value:'Orange, California'}]}});
+    try{
+        const d=w.document,field=d.querySelector('#city');field.value='Or';field.dispatchEvent(new w.Event('input'));
+        await new Promise(resolve=>setTimeout(resolve,300));
+        assert.equal(field.getAttribute('aria-expanded'),'true');
+        w.CropI18n.setLanguage('ur');await tick();
+        assert.equal(d.querySelector('.ac-item span').textContent,'Orange, California, United States');
+        field.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',cancelable:true}));
+        assert.equal(field.getAttribute('aria-activedescendant'),'weather-suggestion-0');
+        field.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',cancelable:true}));
+        assert.equal(field.value,'Orange, California');assert.equal(field.getAttribute('aria-expanded'),'false');
+        assert.equal(requests.length,1);
+    }finally{dom.window.close();}
+});
+
+test('a cleared location cannot reopen stale autocomplete results',async()=>{
+    let finish;const pending=new Promise(resolve=>{finish=resolve;});
+    const {dom,w}=await page('weather','te',{'/weather/suggest?q=Hy':()=>pending});
+    try{
+        const d=w.document,field=d.querySelector('#city');field.value='Hy';field.dispatchEvent(new w.Event('input'));
+        await new Promise(resolve=>setTimeout(resolve,300));
+        field.value='';field.dispatchEvent(new w.Event('input'));
+        finish({suggestions:[{label:'Hyderabad, Telangana',value:'Hyderabad'}]});await tick();
+        assert.equal(d.querySelector('#city-suggestions').hidden,true);
+        assert.equal(d.querySelectorAll('.ac-item').length,0);
+    }finally{dom.window.close();}
+});
+
+test('weather provider errors display a typed location as text, never executable markup',async()=>{
+    const city='<img src=x onerror=alert(1)>';
+    const message=`Location '${city}' not found. Please check the spelling and try another city, district, or state.`;
+    const {dom,w}=await page('weather','te',{['/weather?city='+encodeURIComponent(city)]:{__http:{ok:false,json:async()=>({detail:message})}}});
+    try{
+        const d=w.document;d.querySelector('#city').value=city;
+        d.querySelector('#form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+        assert.equal(d.querySelector('#result img'),null);
+        assert.ok(d.querySelector('#result').textContent.includes(city));
+        assert.ok(d.querySelector('#result').textContent.includes(w.CropI18n.t(message)));
     }finally{dom.window.close();}
 });

@@ -9,7 +9,7 @@ const root=path.resolve(__dirname,'..');
 function runtime(saved='en'){
     const context={window:{},localStorage:{getItem:()=>saved},document:{addEventListener(){}},console};
     vm.createContext(context);
-    for(const name of ['translations.js','translations-complete.js','translations-reports.js','translations-messages.js','translations-descriptions.js','i18n.js'])vm.runInContext(fs.readFileSync(path.join(root,'static/js',name),'utf8'),context);
+    for(const name of ['translations.js','translations-complete.js','translations-reports.js','translations-messages.js','translations-descriptions.js','translations-weather.js','i18n.js'])vm.runInContext(fs.readFileSync(path.join(root,'static/js',name),'utf8'),context);
     return context.window;
 }
 test('all advertised languages have complete core, crop and safety entries',()=>{
@@ -53,5 +53,21 @@ test('parameterized safety messages translate without changing limits or measure
             assert.notEqual(translated,text,code+': '+text);
             assert.deepEqual(translated.match(/\d+(?:\.\d+)?/g),text.match(/\d+(?:\.\d+)?/g));
         }
+    }
+});
+
+test('weather provider messages translate in every regional language and preserve location parameters',()=>{
+    const {CropTranslations:vocabulary,CropI18n:i18n}=runtime();
+    const messages=['Weather location service timed out. Please try again.',
+        'Weather location service is currently unavailable. Please try again later.',
+        'Weather forecast service timed out. Please try again.',
+        'Weather forecast service is currently unavailable. Please try again later.',
+        'Weather forecast data could not be read from Open-Meteo.'];
+    for(const [code]of vocabulary.languages){
+        if(code==='en')continue;
+        messages.forEach(text=>assert.notEqual(i18n.t(text,code),text,code+': '+text));
+        const error="Location 'Orange' not found. Please check the spelling and try another city, district, or state.";
+        assert.notEqual(i18n.t(error,code),error);
+        assert.ok(i18n.t(error,code).includes('Orange'));
     }
 });
