@@ -1,0 +1,387 @@
+{
+  "info": {
+    "name": "Crop Advisor API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base",
+      "value": "http://127.0.0.1:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Meta",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/meta",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "meta"
+          ]
+        }
+      }
+    },
+    {
+      "name": "States",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/states",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "states"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crops",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/crops",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "crops"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crop detail",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/crops/rice",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "crops",
+            "rice"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Predict",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base}}/predict",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "predict"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"N\": 90,\n  \"P\": 42,\n  \"K\": 43,\n  \"temperature\": 20.9,\n  \"humidity\": 82,\n  \"ph\": 6.5,\n  \"rainfall\": 203\n}"
+        }
+      }
+    },
+    {
+      "name": "Predict (out of range)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base}}/predict",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "predict"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"N\": 90,\n  \"P\": 42,\n  \"K\": 43,\n  \"temperature\": 50,\n  \"humidity\": 82,\n  \"ph\": 6.5,\n  \"rainfall\": 203\n}"
+        }
+      }
+    },
+    {
+      "name": "What-if",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base}}/what-if",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "what-if"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"base\": {\n    \"N\": 90,\n    \"P\": 42,\n    \"K\": 43,\n    \"temperature\": 20.9,\n    \"humidity\": 82,\n    \"ph\": 6.5,\n    \"rainfall\": 203\n  },\n  \"changes\": {\n    \"rainfall\": {\n      \"mode\": \"set\",\n      \"value\": 60\n    }\n  }\n}"
+        }
+      }
+    },
+    {
+      "name": "What-if sweep",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base}}/what-if/sweep",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "what-if",
+            "sweep"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"base\": {\n    \"N\": 90,\n    \"P\": 42,\n    \"K\": 43,\n    \"temperature\": 20.9,\n    \"humidity\": 82,\n    \"ph\": 6.5,\n    \"rainfall\": 203\n  },\n  \"feature\": \"rainfall\",\n  \"start\": 30,\n  \"end\": 250,\n  \"steps\": 15\n}"
+        }
+      }
+    },
+    {
+      "name": "Land check",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base}}/land-check",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "land-check"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"crop\": \"rice\",\n  \"conditions\": {\n    \"N\": 90,\n    \"P\": 42,\n    \"K\": 43,\n    \"temperature\": 20.9,\n    \"humidity\": 82,\n    \"ph\": 6.5,\n    \"rainfall\": 203\n  }\n}"
+        }
+      }
+    },
+    {
+      "name": "Fertilizer",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base}}/fertilizer",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "fertilizer"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"crop\": \"rice\",\n  \"N\": 40,\n  \"P\": 30,\n  \"K\": 30,\n  \"area_ha\": 2\n}"
+        }
+      }
+    },
+    {
+      "name": "Profit",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base}}/profit",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "profit"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"crop\": \"rice\",\n  \"area_ha\": 1\n}"
+        }
+      }
+    },
+    {
+      "name": "Rotation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base}}/rotation",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "rotation"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"previous_crop\": \"rice\",\n  \"next_season\": \"Rabi\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Market",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/market/rice?state=Punjab",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "market",
+            "rice"
+          ],
+          "query": [
+            {
+              "key": "state",
+              "value": "Punjab"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/metrics",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "metrics"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Class-wise",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/metrics/classwise",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "metrics",
+            "classwise"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Confusion matrix",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/metrics/confusion-matrix",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "metrics",
+            "confusion-matrix"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Robustness",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/metrics/robustness",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "metrics",
+            "robustness"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Decision rules",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/metrics/decision-rules",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "metrics",
+            "decision-rules"
+          ]
+        }
+      }
+    }
+  ]
+}
