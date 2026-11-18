@@ -104,8 +104,8 @@ def run_predict(v):
 
 # ---------- pages ----------
 PAGES = {"": "index", "dashboard": "dashboard", "recommendation": "recommendation", "ideal-conditions": "ideal_conditions",
-         "land-check": "land_check", "fertilizer": "fertilizer", "market": "market", "profit": "profit",
-         "what-if": "what_if", "rotation": "rotation", "model-performance": "model_performance"}
+         "land-check": "land_check", "fertilizer": "fertilizer", "market": "market", "weather-forecast": "weather",
+         "profit": "profit", "what-if": "what_if", "rotation": "rotation", "model-performance": "model_performance"}
 def _page(name):
     def h(request: Request): return templates.TemplateResponse(request, f"{name}.html", {"page": name})
     return h
@@ -292,6 +292,293 @@ def market(crop: str, state: Optional[str] = None):
     elif not API_KEY: data["message"] += " (Set DATA_GOV_API_KEY to enable live prices.)"
     _mcache[key] = {"t": time.time(), "data": data}
     return {**data, "cached": False}
+
+
+# ---------- weather forecast (Open-Meteo, no API key required) ----------
+INDIAN_STATE_NAMES = {s.lower() for s in C.STATES} | {
+    "orissa", "pondicherry", "jammu & kashmir", "andaman & nicobar islands",
+    "dadra & nagar haveli", "daman & diu", "daman and diu", "new delhi"
+}
+
+
+def _geocode_photon(query: str):
+    """Fallback geocoder (Photon / OpenStreetMap) that supports states, districts, cities, and towns."""
+    resp = requests.get(
+        "https://photon.komoot.io/api/",
+        params={"q": query, "limit": 5, "lang": "en"},
+        headers={"User-Agent": "CropAdvisor/1.0"},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    features = resp.json().get("features") or []
+    if not features:
+        return None
+
+    # Prefer a match inside India when multiple places share the same name
+    in_matches = [f for f in features if f.get("properties", {}).get("countrycode") == "IN"]
+    chosen = in_matches[0] if in_matches else features[0]
+
+    lon, lat = chosen["geometry"]["coordinates"]
+    props = chosen.get("properties") or {}
+    return {
+        "latitude": lat,
+        "longitude": lon,
+        "name": props.get("name") or props.get("city") or props.get("state") or query,
+        "state": props.get("state") or "",
+        "country": props.get("country") or "",
+        "country_code": props.get("countrycode") or "",
+    }
+
+
+def _geocode_open_meteo(query: str):
+    """Primary geocoder using Open-Meteo Geocoding API (no API key required)."""
+    resp = requests.get(
+        "https://geocoding-api.open-meteo.com/v1/search",
+        params={"name": query, "count": 5, "language": "en", "format": "json"},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    results = resp.json().get("results") or []
+    if not results:
+        return None
+
+    # Prefer an Indian match when multiple places share the same name (e.g. Hyderabad, Nagpur)
+    in_matches = [r for r in results if r.get("country_code") == "IN"]
+    chosen = in_matches[0] if in_matches else results[0]
+    return {
+        "latitude": chosen["latitude"],
+        "longitude": chosen["longitude"],
+        "name": chosen.get("name") or query,
+        "state": chosen.get("admin1") or "",
+        "country": chosen.get("country") or "",
+        "country_code": chosen.get("country_code") or "",
+    }
+
+
+def geocode_location(city_name: str):
+    """
+    Resolve a city, town, district, or Indian state/UT name to coordinates.
+    Uses Open-Meteo Geocoding API and falls back to Photon for states, districts,
+    and multi-part queries (e.g. 'Telangana', 'East Godavari', 'Warangal, Telangana').
+    """
+    lower_name = city_name.lower()
+    is_state_or_compound = (
+        lower_name in INDIAN_STATE_NAMES
+        or "," in lower_name
+        or "district" in lower_name
+    )
+
+    # For Indian states/UTs and district/comma queries, Photon handles administrative boundaries reliably
+    if is_state_or_compound:
+        try:
+            place = _geocode_photon(city_name)
+            if place:
+                return place
+        except requests.RequestException as e:
+            log.warning("Photon geocoding failed for '%s': %s", city_name, e)
+
+    # Try Open-Meteo Geocoding API first for cities and towns
+    open_meteo_place = None
+    open_meteo_error = None
+    try:
+        open_meteo_place = _geocode_open_meteo(city_name)
+    except requests.Timeout:
+        open_meteo_error = "timeout"
+    except requests.RequestException as e:
+        log.warning("Open-Meteo geocoding failed for '%s': %s", city_name, e)
+        open_meteo_error = "unavailable"
+
+    # If Open-Meteo found an Indian location, use it right away
+    if open_meteo_place and open_meteo_place["country_code"] == "IN":
+        return open_meteo_place
+
+    # Otherwise check Photon (covers Indian districts like East Godavari, Kanyakumari, Paschim Medinipur)
+    try:
+        photon_place = _geocode_photon(city_name)
+        if photon_place and photon_place["country_code"] == "IN":
+            return photon_place
+        if open_meteo_place:
+            return open_meteo_place
+        if photon_place:
+            return photon_place
+    except requests.Timeout:
+        if open_meteo_place:
+            return open_meteo_place
+        if open_meteo_error == "timeout":
+            raise HTTPException(504, "Weather location service timed out. Please try again.")
+    except requests.RequestException as e:
+        log.warning("Photon fallback geocoding failed for '%s': %s", city_name, e)
+        if open_meteo_place:
+            return open_meteo_place
+
+    if open_meteo_error == "timeout":
+        raise HTTPException(504, "Weather location service timed out. Please try again.")
+    if open_meteo_error == "unavailable":
+        raise HTTPException(502, "Weather location service is currently unavailable. Please try again later.")
+
+    return None
+
+
+@app.get("/weather/suggest", tags=["Weather"])
+def weather_suggest(q: str = ""):
+    """Return live city, district, and state autocomplete suggestions (no API key required)."""
+    query = q.strip()
+    if len(query) < 2:
+        return {"suggestions": []}
+
+    suggestions = []
+    seen_labels = set()
+
+    def add_suggestion(label: str, value: str):
+        key = label.lower()
+        if key not in seen_labels:
+            seen_labels.add(key)
+            suggestions.append({"label": label, "value": value})
+
+    # 1. Include matching Indian states/UTs first for instant state autocomplete
+    query_lower = query.lower()
+    for state_name in C.STATES:
+        if query_lower in state_name.lower():
+            add_suggestion(f"{state_name}, India", state_name)
+
+    # 2. Fetch matching cities and towns from Open-Meteo Geocoding API
+    try:
+        resp = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": query, "count": 8, "language": "en", "format": "json"},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        results = resp.json().get("results") or []
+
+        # Show Indian matches before international matches
+        results.sort(key=lambda r: 0 if r.get("country_code") == "IN" else 1)
+
+        for item in results:
+            name = item.get("name") or ""
+            admin1 = item.get("admin1") or ""
+            country = item.get("country") or ""
+            if not name:
+                continue
+
+            parts = [name]
+            if admin1 and admin1.lower() != name.lower():
+                parts.append(admin1)
+            if country:
+                parts.append(country)
+            label = ", ".join(parts)
+
+            value = f"{name}, {admin1}" if admin1 and admin1.lower() != name.lower() else name
+            add_suggestion(label, value)
+    except requests.RequestException as e:
+        log.warning("Open-Meteo suggest failed for '%s': %s", query, e)
+
+    # 3. If fewer than 3 suggestions found, also check Photon (covers Indian districts)
+    if len(suggestions) < 3:
+        try:
+            resp = requests.get(
+                "https://photon.komoot.io/api/",
+                params={"q": query, "limit": 5, "lang": "en"},
+                headers={"User-Agent": "CropAdvisor/1.0"},
+                timeout=5,
+            )
+            resp.raise_for_status()
+            features = resp.json().get("features") or []
+            features.sort(key=lambda f: 0 if f.get("properties", {}).get("countrycode") == "IN" else 1)
+
+            for feat in features:
+                props = feat.get("properties") or {}
+                name = props.get("name") or props.get("city") or ""
+                state = props.get("state") or ""
+                country = props.get("country") or ""
+                if not name:
+                    continue
+
+                parts = [name]
+                if state and state.lower() != name.lower():
+                    parts.append(state)
+                if country:
+                    parts.append(country)
+                label = ", ".join(parts)
+
+                value = f"{name}, {state}" if state and state.lower() != name.lower() else name
+                add_suggestion(label, value)
+        except requests.RequestException as e:
+            log.warning("Photon suggest failed for '%s': %s", query, e)
+
+    return {"suggestions": suggestions[:8]}
+
+
+@app.get("/weather", tags=["Weather"])
+def weather(city: str = "Hyderabad"):
+    """Fetch a 7-day weather forecast for any city, town, district, or state using Open-Meteo."""
+    city_name = city.strip()
+    if not city_name:
+        raise HTTPException(400, "Please enter a city, district, or state name.")
+
+    # Step 1: Convert location name to latitude and longitude
+    place = geocode_location(city_name)
+    if not place:
+        raise HTTPException(404, f"Location '{city_name}' not found. Please check the spelling and try another city, district, or state.")
+
+    latitude = place["latitude"]
+    longitude = place["longitude"]
+    location_name = place["name"]
+    state_name = place["state"]
+    country_name = place["country"]
+
+    # Step 2: Request the 7-day daily weather forecast using latitude and longitude
+    try:
+        forecast_response = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": latitude,
+                "longitude": longitude,
+                "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,relative_humidity_2m_mean",
+                "timezone": "auto",
+                "forecast_days": 7,
+            },
+            timeout=10,
+        )
+        forecast_response.raise_for_status()
+        forecast_data = forecast_response.json()
+    except requests.Timeout:
+        raise HTTPException(504, "Weather forecast service timed out. Please try again.")
+    except requests.RequestException as e:
+        log.warning("weather forecast API failed: %s", e)
+        raise HTTPException(502, "Weather forecast service is currently unavailable. Please try again later.")
+
+    # Step 3: Process the daily arrays into a clean list of 7 forecast day objects
+    daily = forecast_data.get("daily") or {}
+    dates = daily.get("time") or []
+    max_temps = daily.get("temperature_2m_max") or []
+    min_temps = daily.get("temperature_2m_min") or []
+    rain_amounts = daily.get("precipitation_sum") or []
+    rain_probs = daily.get("precipitation_probability_max") or []
+    humidities = daily.get("relative_humidity_2m_mean") or []
+
+    if not dates:
+        raise HTTPException(502, "Weather forecast data could not be read from Open-Meteo.")
+
+    days = []
+    for i in range(len(dates)):
+        days.append({
+            "date": dates[i],
+            "max_temp_c": max_temps[i] if i < len(max_temps) else None,
+            "min_temp_c": min_temps[i] if i < len(min_temps) else None,
+            "humidity_percent": humidities[i] if i < len(humidities) else None,
+            "rain_mm": rain_amounts[i] if i < len(rain_amounts) else None,
+            "rain_probability": rain_probs[i] if i < len(rain_probs) else None,
+        })
+
+    return {
+        "location": location_name,
+        "state": state_name,
+        "country": country_name,
+        "days": days,
+        "source": "Open-Meteo",
+        "note": "Forecast is approximate. Check local weather alerts before farm operations.",
+    }
 
 
 # ---------- profit ----------

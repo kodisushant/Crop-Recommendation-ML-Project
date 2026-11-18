@@ -1523,12 +1523,214 @@ pageControllers.model_performance = async function () {
     getElement('#confusion-table').replaceChildren(matrix);
 };
 
+// ----------------------------------------------------------------------------
+// 4.12 7-Day Weather Forecast (Open-Meteo)
+// ----------------------------------------------------------------------------
+pageControllers.weather = function () {
+    const formElement = getElement("#form");
+    const cityInput = getElement("#city");
+    const submitButton = getElement("#go");
+    const resultContainer = getElement("#result");
+    const suggestionsBox = getElement("#city-suggestions");
+
+    if (!formElement || !cityInput || !resultContainer) return;
+
+    function escapeHtml(text) {
+        return String(text ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function formatValue(value, fallback = "–") {
+        return value === null || value === undefined ? fallback : value;
+    }
+
+    // ---- Live city / district / state autocomplete ----
+    let suggestTimer = null;
+    let latestSuggestId = 0;
+    let currentSuggestions = [];
+    let activeSuggestionIndex = -1;
+
+    function hideSuggestions() {
+        if (!suggestionsBox) return;
+        suggestionsBox.hidden = true;
+        suggestionsBox.innerHTML = "";
+        currentSuggestions = [];
+        activeSuggestionIndex = -1;
+    }
+
+    function selectSuggestion(item) {
+        cityInput.value = item.value;
+        hideSuggestions();
+        cityInput.focus();
+    }
+
+    function renderSuggestions(items) {
+        if (!suggestionsBox) return;
+        currentSuggestions = items;
+        activeSuggestionIndex = -1;
+
+        if (!items.length) {
+            hideSuggestions();
+            return;
+        }
+
+        suggestionsBox.innerHTML = items.map((item, idx) => `
+            <li class="ac-item" role="option" data-index="${idx}">
+                <i class="fa-solid fa-location-dot" style="color:var(--fresh);margin-right:6px"></i>${escapeHtml(item.label)}
+            </li>
+        `).join("");
+        suggestionsBox.hidden = false;
+    }
+
+    function updateActiveSuggestion() {
+        if (!suggestionsBox) return;
+        getAllElements(".ac-item", suggestionsBox).forEach((el, idx) => {
+            el.classList.toggle("active", idx === activeSuggestionIndex);
+        });
+    }
+
+    if (suggestionsBox) {
+        cityInput.addEventListener("input", () => {
+            const query = cityInput.value.trim();
+            clearTimeout(suggestTimer);
+
+            if (query.length < 2) {
+                hideSuggestions();
+                return;
+            }
+
+            suggestTimer = setTimeout(async () => {
+                const requestId = ++latestSuggestId;
+                try {
+                    const data = await fetchApi(`/weather/suggest?q=${encodeURIComponent(query)}`);
+                    if (requestId !== latestSuggestId) return;
+                    renderSuggestions(data.suggestions || []);
+                } catch {
+                    if (requestId === latestSuggestId) hideSuggestions();
+                }
+            }, 250);
+        });
+
+        // Use mousedown so clicking a suggestion works before input blur
+        suggestionsBox.addEventListener("mousedown", event => {
+            const itemEl = event.target.closest(".ac-item");
+            if (!itemEl) return;
+            event.preventDefault();
+            const idx = parseInt(itemEl.dataset.index, 10);
+            if (!isNaN(idx) && currentSuggestions[idx]) {
+                selectSuggestion(currentSuggestions[idx]);
+            }
+        });
+
+        // Keyboard navigation (ArrowDown, ArrowUp, Enter, Escape)
+        cityInput.addEventListener("keydown", event => {
+            if (suggestionsBox.hidden || !currentSuggestions.length) return;
+
+            if (event.key === "ArrowDown") {
+                event.preventDefault();
+                activeSuggestionIndex = (activeSuggestionIndex + 1) % currentSuggestions.length;
+                updateActiveSuggestion();
+            } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                activeSuggestionIndex = (activeSuggestionIndex - 1 + currentSuggestions.length) % currentSuggestions.length;
+                updateActiveSuggestion();
+            } else if (event.key === "Enter" && activeSuggestionIndex >= 0) {
+                event.preventDefault();
+                selectSuggestion(currentSuggestions[activeSuggestionIndex]);
+            } else if (event.key === "Escape") {
+                hideSuggestions();
+            }
+        });
+
+        document.addEventListener("click", event => {
+            if (!event.target.closest(".city-ac")) {
+                hideSuggestions();
+            }
+        });
+    }
+
+    // ---- Fetch and render 7-day forecast ----
+    formElement.onsubmit = function (event) {
+        event.preventDefault();
+        hideSuggestions();
+
+        executeWithLoadingState(submitButton, async function () {
+            const city = cityInput.value.trim();
+            if (!city) {
+                throw new Error("Please enter a city, district, or state name.");
+            }
+
+            // Show a clear loading message while fetching live forecast data
+            resultContainer.innerHTML = `
+                <div class="panel">
+                    ${renderEmptyPlaceholder("fa-spinner fa-spin", `Loading 7-day weather forecast for ${escapeHtml(city)}...`)}
+                </div>
+            `;
+
+            const url = `/weather?city=${encodeURIComponent(city)}`;
+            const forecast = await fetchApi(url);
+
+            const locationParts = [forecast.location];
+            if (forecast.state && forecast.state.toLowerCase() !== String(forecast.location || "").toLowerCase()) {
+                locationParts.push(forecast.state);
+            }
+            if (forecast.country) {
+                locationParts.push(forecast.country);
+            }
+            const locationLabel = locationParts.filter(Boolean).join(", ");
+
+            const rowsHtml = (forecast.days || []).map(day => `
+                <tr>
+                    <td><b>${escapeHtml(day.date)}</b></td>
+                    <td>${formatValue(day.min_temp_c)}</td>
+                    <td>${formatValue(day.max_temp_c)}</td>
+                    <td>${formatValue(day.humidity_percent)}%</td>
+                    <td>${formatValue(day.rain_mm)}</td>
+                    <td>${formatValue(day.rain_probability)}%</td>
+                </tr>
+            `).join("");
+
+            resultContainer.innerHTML = `
+                <div class="panel">
+                    <div class="inl" style="justify-content:space-between;align-items:center">
+                        <h3 style="margin:0"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(locationLabel)}</h3>
+                        ${renderBadge("live", `Source: ${escapeHtml(forecast.source)}`)}
+                    </div>
+                </div>
+
+                <div class="panel tw">
+                    <h3><i class="fa-solid fa-calendar-week"></i> 7-Day Forecast</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Min Temperature (°C)</th>
+                                <th>Max Temperature (°C)</th>
+                                <th>Humidity (%)</th>
+                                <th>Rainfall (mm)</th>
+                                <th>Rain Probability (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                    <div class="note">${escapeHtml(forecast.note)}</div>
+                </div>
+            `;
+        });
+    };
+};
+
 
 // ============================================================================
 // 5. APPLICATION BOOTSTRAPPER
 // ============================================================================
 
-document.addEventListener("DOMContentLoaded", () => {
+function initApp() {
     // Mobile navigation burger menu toggle
     const burgerButton = getElement(".burger");
     if (burgerButton) {
@@ -1575,4 +1777,10 @@ document.addEventListener("DOMContentLoaded", () => {
             showToast(err.message, "error");
         });
     }
-});
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initApp);
+} else {
+    initApp();
+}
