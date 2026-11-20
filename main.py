@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional, Dict, Literal
 import re
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -115,15 +115,11 @@ def run_predict(v):
     except ValueError as e: raise HTTPException(422, str(e))
 
 
-# ---------- pages ----------
-PAGES = {"": "index", "dashboard": "dashboard", "recommendation": "recommendation", "ideal-conditions": "ideal_conditions",
-         "land-check": "land_check", "fertilizer": "fertilizer", "market": "market", "profit": "profit",
-         "what-if": "what_if", "rotation": "rotation", "model-performance": "model_performance"}
-def _page(name):
-    def h(request: Request): return templates.TemplateResponse(request, f"{name}.html", {"page": name})
-    return h
-for path, name in PAGES.items():
-    app.add_api_route("/" + path, _page(name), methods=["GET"], include_in_schema=False)
+# ---------- root redirect to docs ----------
+@app.get("/", include_in_schema=False)
+def root():
+    """Redirect root directly to Swagger UI documentation."""
+    return RedirectResponse(url="/docs")
 
 @app.get("/health", include_in_schema=False)
 def health(): return {"status": "ok"}
