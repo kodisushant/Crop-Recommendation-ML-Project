@@ -3,7 +3,7 @@ Works independently of train_model.py: it only loads the saved .pkl files."""
 import json, joblib, numpy as np, pandas as pd
 from pathlib import Path
 
-BASE = Path(__file__).parent
+BASE = Path(__file__).resolve().parents[2]
 FEATURES = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
 HARD_LIMITS = {"N": (0, 300), "P": (0, 300), "K": (0, 400), "temperature": (-5, 55),
                "humidity": (0, 100), "ph": (0, 14), "rainfall": (0, 1000)}

@@ -6,7 +6,7 @@ AI crop recommendation (22 crops) with confidence, out-of-range detection and pl
 - **Dataset:** the uploaded `Crop_recommendation.csv` has 2,200 rows, 22 crops, 7 features (N, P, K, temperature, humidity, pH, rainfall). The Feature Guide PDF describes a different dataset (12 crops, state/season/soil). **State, season and soil type are not ML inputs.** State is only used to filter market prices.
 - **Accuracy (~99.5%)** is genuine for this clean, well-separated dataset; real farm data will score lower.
 - **Model choice:** Gaussian NB, Random Forest and Extra Trees are statistically tied (CV 0.9915–0.9949). Random Forest is the production model because its probabilities suit confidence analysis. The tie-break result is recorded in `models/metrics.json`.
-- **Indicative data:** prices, yields, costs, fertilizer doses, durations, soil types (`crop_data.py`) are *not* verified. Confirm with ICAR / your state agricultural university. Sponsor entries are placeholders.
+- **Indicative data:** prices, yields, costs, fertilizer doses, durations, soil types (`src/crop_advisor/crop_data.py`) are *not* verified. Confirm with ICAR / your state agricultural university. Sponsor entries are placeholders.
 - **Not tested here:** live data.gov.in prices (needs your free API key) and the public Render deployment. Without a key the app shows clearly-labelled reference prices.
 - `reliability.png` is not generated.
 
@@ -17,12 +17,12 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1      # if blocked: Set-ExecutionPolicy -Scope Process Bypass
 pip install -r requirements.txt
 copy .env.example .env             # optional: add DATA_GOV_API_KEY
-python -m uvicorn main:app --reload
+python -m uvicorn src.crop_advisor.main:app --reload
 ```
-Open http://127.0.0.1:8000 (website) and http://127.0.0.1:8000/docs (Swagger). Models are already trained; to retrain: `python train_model.py`.
+Open http://127.0.0.1:8000 (website) and http://127.0.0.1:8000/docs (Swagger). Models are already trained; to retrain: `python -m src.crop_advisor.train_model`.
 
 ## Test the API in Postman
-Import `Crop_Advisor.postman_collection.json` (variable `base` = `http://127.0.0.1:8000`) and send requests.
+Import `postman/Crop_Advisor.postman_collection.json` (variable `base` = `http://127.0.0.1:8000`) and send requests.
 
 ## Deploy publicly on Render (free, HTTPS)
 1. Create a GitHub account and a new repository; upload this folder (keep `models/`, `data/`, `plots/`; `.env` is git-ignored).
@@ -32,7 +32,7 @@ Import `Crop_Advisor.postman_collection.json` (variable `base` = `http://127.0.0
 5. Redeploy after changes: `git add . && git commit -m "update" && git push` – Render redeploys automatically.
 
 ## Files
-`preprocessing.py` load/clean/split · `train_model.py` 8 models, 5-fold CV, plots, saves models · `predictor.py` prediction, confidence, OOD, stability, explanations · `crop_data.py` reference tables · `main.py` FastAPI + pages · `templates/` + `static/` frontend.
+`src/crop_advisor/` backend and ML package (`preprocessing.py`, `train_model.py`, `predictor.py`, `crop_data.py`, `main.py`) · `templates/` + `static/` frontend.
 
 ## How confidence works
 LOW_CONFIDENCE: top probability < 0.50, or top-2 margin < 0.15, or top crop changes in > 30% of 40 noisy re-runs. OUT_OF_RANGE: a value outside the training min/max, or Mahalanobis distance beyond the 99th percentile of training rows → no crop returned. Limitation: combinations where every value is individually normal can be missed.

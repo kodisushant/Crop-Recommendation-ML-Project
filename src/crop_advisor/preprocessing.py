@@ -1,8 +1,9 @@
 """Step 1: load, inspect, clean and split the Crop Recommendation dataset."""
+from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-DATA_PATH = "data/Crop_recommendation.csv"
+DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "Crop_recommendation.csv"
 FEATURES = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
 TARGET = "label"
 RANDOM_STATE = 42

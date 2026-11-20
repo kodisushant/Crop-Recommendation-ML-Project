@@ -14,10 +14,10 @@ try:
     from dotenv import load_dotenv; load_dotenv()
 except ImportError:
     pass
-import predictor as P
-import crop_data as C
+from . import predictor as P
+from . import crop_data as C
 
-BASE = Path(__file__).parent
+BASE = Path(__file__).resolve().parents[2]
 log = logging.getLogger("crop-advisor")
 app = FastAPI(title="Crop Advisor API", version="1.0",
               description="AI crop recommendation with confidence, out-of-range detection and planning tools.")
