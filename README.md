@@ -1,6 +1,5 @@
 # CROP ADVISOR – Grow Smarter. Harvest Better.
 
-Regional language selector: English plus 12 major Indian languages, remembered across pages; Urdu includes RTL layout. Main controls, crop names, status messages and chart labels use offline dictionaries. Unreviewed detailed technical text remains English with a visible notice. See [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md) for coverage, limitations and translation-review guidance.
 AI crop recommendation (22 crops) with confidence, out-of-range detection and planning tools. FastAPI serves both the API and the website.
 
 User accounts and MongoDB history are grouped in [`user_history/`](user_history/README.md). Register or sign in, run a crop recommendation/soil analysis, then open **History** to reopen reports, reuse inputs or delete your own entries. Login accounts share history across devices using the same app/database. All twelve regional languages are supported for the new account/history interface. Local MongoDB defaults to `mongodb://127.0.0.1:27017`, database `crop_advisor`; configuration and tests are explained in the feature README.
