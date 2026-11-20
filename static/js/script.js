@@ -93,7 +93,6 @@ const FIELD_DEFINITIONS = {
         step: 0.1
     }
 };
-window.CropFields = FIELD_DEFINITIONS;
 
 /** Palette for charts and graphical elements */
 const CHART_COLORS = [
@@ -161,19 +160,14 @@ function showToast(message, type = "ok") {
  * @param {object|null} requestBody - Optional request payload for POST requests
  * @returns {Promise<object>} Parsed JSON response
  */
-async function fetchApi(url, requestBody = null, method = null) {
+async function fetchApi(url, requestBody = null) {
     let response;
     try {
-        const fetchOptions = {
-            method: method || (requestBody !== null ? 'POST' : 'GET'),
-            credentials: 'same-origin',
-            headers: {'X-Crop-Request':'1'}
-        };
-        if(requestBody !== null){
-            fetchOptions.headers['Content-Type']='application/json';
-            fetchOptions.body=JSON.stringify(requestBody);
-        }
-        if(url==='/predict')fetchOptions.headers['X-Activity-Source']=document.body.dataset.analysisMode==='soil'?'soil-analysis':'recommendation';
+        const fetchOptions = requestBody ? {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody)
+        } : undefined;
 
         response = await fetch(url, fetchOptions);
     } catch (networkError) {
@@ -190,9 +184,7 @@ async function fetchApi(url, requestBody = null, method = null) {
                 .map(err => `${(err.loc || []).slice(-1)[0]}: ${err.msg}`)
                 .join("; ");
         }
-        const error=new Error(errorMessage || `Request failed with status ${response.status}`);
-        error.status=response.status;
-        throw error;
+        throw new Error(errorMessage || `Request failed with status ${response.status}`);
     }
 
     return jsonResponse;
@@ -219,7 +211,6 @@ function renderChart(canvasId, chartConfig) {
     );
 
     activeChartInstances[canvasId] = new Chart(canvasElement, chartConfig);
-    window.CropI18n?.registerChart(activeChartInstances[canvasId]);
 }
 
 /**
@@ -242,14 +233,11 @@ async function executeWithLoadingState(submitButton, asyncAction) {
         showToast(error.message, "error");
         const resultContainer = getElement("#result");
         if (resultContainer) {
-            // Provider errors can contain the location the user typed. Treat
-            // that message as text so it cannot create HTML or event handlers.
-            const alert = document.createElement('div');
-            alert.className = 'alert bad';
-            const heading = document.createElement('b');
-            heading.textContent = 'Something went wrong:';
-            alert.append(heading, document.createTextNode(' ' + error.message));
-            resultContainer.replaceChildren(alert);
+            resultContainer.innerHTML = `
+                <div class="alert bad">
+                    <b>Something went wrong:</b> ${error.message}
+                </div>
+            `;
         }
     } finally {
         submitButton.classList.remove("loading");
@@ -333,7 +321,7 @@ async function populateCropDropdown(selectElement, includeBlankOption = false) {
  * Populates a <select> element with Indian States dynamically from /states
  * @param {HTMLSelectElement} selectElement - Target dropdown element
  */
-async function populateStateDropdown(selectElement) {
+async function populateStateDropdown(selectElement, blankLabel = "All India") {
     if (!selectElement) return;
     let statesList = [];
 
@@ -345,7 +333,7 @@ async function populateStateDropdown(selectElement) {
     }
 
     const optionsHtml = statesList.map(stateName => `<option>${stateName}</option>`).join("");
-    selectElement.innerHTML = `<option value="">All India</option>` + optionsHtml;
+    selectElement.innerHTML = `<option value="">${blankLabel}</option>` + optionsHtml;
 }
 
 /**
@@ -473,9 +461,6 @@ pageControllers.dashboard = async function () {
         }
     });
 
-    // History belongs to the signed-in account and is read from MongoDB.
-    await window.CropHistory.recent();
-    document.addEventListener('languagechange',()=>window.CropHistory.recent());
 };
 
 // ----------------------------------------------------------------------------
@@ -483,18 +468,36 @@ pageControllers.dashboard = async function () {
 // ----------------------------------------------------------------------------
 pageControllers.recommendation = async function () {
     const stateSelect = getElement("#state");
+    const districtInput = getElement("#district");
     const fillExampleBtn = getElement("#fill-example");
     const formElement = getElement("#predict-form");
 
-    // 1. Populate states dynamically and restore saved input values
-    await populateStateDropdown(stateSelect);
-    if(getLastSavedFormValues().state)stateSelect.value=getLastSavedFormValues().state;
-    restoreFieldInputs(Object.keys(FIELD_DEFINITIONS));
+    // 1. Populate the location picker and restore only the four manual soil inputs.
+    await populateStateDropdown(stateSelect, "Select a State / UT");
+    restoreFieldInputs(["N", "P", "K", "ph"]);
+
+    stateSelect.onchange = async function () {
+        districtInput.disabled = true;
+        districtInput.innerHTML = `<option value="">Loading districts…</option>`;
+        if (!stateSelect.value) {
+            districtInput.innerHTML = `<option value="">Select a State / UT first</option>`;
+            return;
+        }
+        try {
+            const districts = await fetchApi(`/districts?state=${encodeURIComponent(stateSelect.value)}`);
+            districtInput.innerHTML = `<option value="">Select a district</option>` + districts.map(district => `<option value="${district}">${district}</option>`).join("");
+            districtInput.disabled = false;
+        } catch (error) {
+            districtInput.innerHTML = `<option value="">Districts unavailable</option>`;
+            showToast(error.message, "error");
+        }
+    };
 
     // 2. Pre-fill typical Rice example values
     if (fillExampleBtn) {
         fillExampleBtn.onclick = function () {
-            Object.entries(FIELD_DEFINITIONS).forEach(([key, def]) => {
+            ["N", "P", "K", "ph"].forEach(key => {
+                const def = FIELD_DEFINITIONS[key];
                 const input = getElement("#f-" + key);
                 if (input) input.value = def.defaultValue;
             });
@@ -508,25 +511,20 @@ pageControllers.recommendation = async function () {
         const submitButton = getElement("#go");
 
         executeWithLoadingState(submitButton, async function () {
-            // Read all 7 input values
-            const conditionsPayload = readFormFeatures(Object.keys(FIELD_DEFINITIONS));
-            conditionsPayload.state = stateSelect.value || null;
+            if (!districtInput.value) {
+                throw new Error("Choose a district before continuing.");
+            }
+            const conditionsPayload = readFormFeatures(["N", "P", "K", "ph"]);
+            conditionsPayload.location = {
+                state: stateSelect.value,
+                district: districtInput.value
+            };
 
             // Send to FastAPI /predict
             const predictionResult = await fetchApi("/predict", conditionsPayload);
 
             // Display results in UI
             displayRecommendationResult(predictionResult);
-
-            // The server saves signed-in predictions. Never claim a save when
-            // MongoDB is unavailable, and keep showing the model result.
-            const saved=predictionResult.history;
-            if(saved){
-                const message=document.createElement('p');message.className='note';
-                message.textContent=saved.saved?'Saved to your history.':saved.reason==='storage_unavailable'?
-                    'This result could not be saved. Please try again later.':'Sign in to save and view your history across devices.';
-                getElement('#result').append(message);
-            }
 
             // Smooth scroll to result
             getElement("#result").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -540,6 +538,21 @@ pageControllers.recommendation = async function () {
 function displayRecommendationResult(result) {
     const status = result.status;
     let htmlContent = "";
+
+    if (result.weather && result.location) {
+        htmlContent += `
+            <div class="panel">
+                <h3><i class="fa-solid fa-cloud-sun"></i> Weather used for ${result.location.district}, ${result.location.state}</h3>
+                <div class="kv">
+                    <div><b>${result.weather.temperature.toFixed(1)}°C</b><span>Current temperature</span></div>
+                    <div><b>${result.weather.humidity.toFixed(0)}%</b><span>Current humidity</span></div>
+                    <div><b>${result.weather.annual_rainfall.toFixed(1)} mm</b><span>Rainfall, previous ${result.weather.rainfall_period_days} days</span></div>
+                    <div><b>${result.weather.rainfall.toFixed(1)} mm</b><span>Monthly rainfall used by model</span></div>
+                </div>
+                <p class="note">Retrieved at ${result.weather.observed_at} from ${result.weather.source}. The model uses the 365-day rainfall total divided by 12, matching its monthly rainfall scale.${result.weather.rainfall_capped ? ` The normalized value was outside the model range and was set to the supported maximum of ${result.weather.rainfall_maximum.toFixed(1)} mm.` : ""} Temperature and humidity are current conditions.</p>
+            </div>
+        `;
+    }
 
     // CASE A: Out of Distribution / Unusual Range
     if (status === "OUT_OF_RANGE") {
@@ -592,13 +605,13 @@ function displayRecommendationResult(result) {
                     <canvas id="c-top"></canvas>
                 </div>
             </div>
-            <div class="panel" id="soil-analysis-panel">
-                <h3><i class="fa-solid fa-magnifying-glass-chart"></i> Soil Analysis</h3>
+            <div class="panel">
+                <h3><i class="fa-solid fa-magnifying-glass-chart"></i> What Drove This Prediction</h3>
                 <div class="chart-box" style="height:260px">
                     <canvas id="c-exp"></canvas>
                 </div>
                 <div class="note">
-                    Positive values support ${capitalizeFirstLetter(topCrop.crop)} in the model; this is not a causal soil or fertilizer recommendation.
+                    Positive values push towards ${capitalizeFirstLetter(topCrop.crop)}. Feature effect estimated via model-agnostic random permutation occlusion.
                 </div>
             </div>
         `;
@@ -633,13 +646,6 @@ function displayRecommendationResult(result) {
     `;
 
     getElement("#result").innerHTML = htmlContent;
-
-    // Opening Soil Analysis should visibly open that feature, even when its
-    // translated label differs. Routing and mode use stable identifiers.
-    if (document.body.dataset.analysisMode === "soil") {
-        const analysisPanel = getElement("#soil-analysis-panel");
-        if (analysisPanel) getElement("#result").prepend(analysisPanel);
-    }
 
     // Render Charts if recommendation was valid
     if (status !== "OUT_OF_RANGE") {
@@ -697,8 +703,7 @@ pageControllers.ideal_conditions = async function () {
         const selectedSeason = seasonFilter.value;
 
         const filtered = detailedCrops.filter(c => {
-            const localName = window.CropI18n?.t(capitalizeFirstLetter(c.crop)) || c.crop;
-            const matchesQuery = c.crop.toLowerCase().includes(query) || localName.toLowerCase().includes(query);
+            const matchesQuery = c.crop.toLowerCase().includes(query);
             const matchesSeason = !selectedSeason || c.seasons.includes(selectedSeason);
             return matchesQuery && matchesSeason;
         });
@@ -735,7 +740,6 @@ pageControllers.ideal_conditions = async function () {
 
     searchInput.oninput = renderFilteredCards;
     seasonFilter.onchange = renderFilteredCards;
-    document.addEventListener('languagechange', renderFilteredCards);
     renderFilteredCards();
 };
 
@@ -1381,12 +1385,11 @@ pageControllers.rotation = async function () {
 // ----------------------------------------------------------------------------
 pageControllers.model_performance = async function () {
     // Fetch metrics, class-wise F1, robustness tests, and surrogate tree rules in parallel
-    const [metrics, classwiseMetrics, robustnessData, decisionRules, confusion] = await Promise.all([
+    const [metrics, classwiseMetrics, robustnessData, decisionRules] = await Promise.all([
         fetchApi("/metrics"),
         fetchApi("/metrics/classwise"),
         fetchApi("/metrics/robustness"),
-        fetchApi("/metrics/decision-rules"),
-        fetchApi("/metrics/confusion-matrix")
+        fetchApi("/metrics/decision-rules")
     ]);
 
     // 1. Display Selected Model & Tie-Break Logic
@@ -1481,250 +1484,6 @@ pageControllers.model_performance = async function () {
 
     // 6. Decision Tree Human-Readable Surrogate Rules
     getElement("#rules").textContent = decisionRules.rules;
-
-    // Live labels can be translated; text baked into PNG plots cannot.
-    renderChart('c-comparison', {
-        type:'bar',data:{labels:metrics.comparison.map(row=>row.Model),datasets:[
-            {label:'CV Accuracy',data:metrics.comparison.map(row=>row['CV Accuracy']*100),backgroundColor:'#4C956C'},
-            {label:'Test Accuracy',data:metrics.comparison.map(row=>row['Test Accuracy']*100),backgroundColor:'#174D32'}
-        ]},options:{scales:{y:{max:100,title:{display:true,text:'Accuracy (%)'}}}}
-    });
-    const matrix=document.createElement('table');
-    const heading=document.createElement('tr');
-    for(const value of ['Actual / Predicted',...confusion.classes.map(capitalizeFirstLetter)]){
-        const cell=document.createElement('th');cell.textContent=value;heading.appendChild(cell);
-    }
-    matrix.appendChild(heading);
-    confusion.matrix.forEach((values,index)=>{
-        const row=document.createElement('tr');
-        const label=document.createElement('th');label.textContent=capitalizeFirstLetter(confusion.classes[index]);row.appendChild(label);
-        values.forEach((value,column)=>{const cell=document.createElement('td');cell.textContent=value;if(index===column)cell.style.background='#DCECCB';row.appendChild(cell);});
-        matrix.appendChild(row);
-    });
-    getElement('#confusion-table').replaceChildren(matrix);
-};
-
-// ----------------------------------------------------------------------------
-// 4.12 7-Day Weather Forecast (Open-Meteo)
-// ----------------------------------------------------------------------------
-pageControllers.weather = function () {
-    const formElement = getElement("#form");
-    const cityInput = getElement("#city");
-    const submitButton = getElement("#go");
-    const resultContainer = getElement("#result");
-    const suggestionsBox = getElement("#city-suggestions");
-
-    if (!formElement || !cityInput || !resultContainer) return;
-
-    function escapeHtml(text) {
-        return String(text ?? "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;");
-    }
-
-    function formatValue(value, suffix = "") {
-        return typeof value === "number" && Number.isFinite(value) ? String(value) + suffix : "–";
-    }
-
-    // ---- Live city / district / state autocomplete ----
-    let suggestTimer = null;
-    let latestSuggestId = 0;
-    let currentSuggestions = [];
-    let activeSuggestionIndex = -1;
-
-    function hideSuggestions() {
-        // Invalidate any older response, including when a query is cleared.
-        latestSuggestId++;
-        if (!suggestionsBox) return;
-        suggestionsBox.hidden = true;
-        cityInput.setAttribute('aria-expanded','false');
-        cityInput.removeAttribute('aria-activedescendant');
-        suggestionsBox.innerHTML = "";
-        currentSuggestions = [];
-        activeSuggestionIndex = -1;
-    }
-
-    function selectSuggestion(item) {
-        cityInput.value = item.value;
-        hideSuggestions();
-        cityInput.focus();
-    }
-
-    function renderSuggestions(items) {
-        if (!suggestionsBox) return;
-        currentSuggestions = items;
-        activeSuggestionIndex = -1;
-
-        if (!items.length) {
-            hideSuggestions();
-            return;
-        }
-
-        suggestionsBox.innerHTML = items.map((item, idx) => `
-            <li class="ac-item" role="option" id="weather-suggestion-${idx}" aria-selected="false" data-index="${idx}">
-                <i class="fa-solid fa-location-dot" aria-hidden="true"></i><span translate="no">${escapeHtml(item.label)}</span>
-            </li>
-        `).join("");
-        suggestionsBox.hidden = false;
-        cityInput.setAttribute('aria-expanded','true');
-    }
-
-    function updateActiveSuggestion() {
-        if (!suggestionsBox) return;
-        getAllElements(".ac-item", suggestionsBox).forEach((el, idx) => {
-            el.classList.toggle("active", idx === activeSuggestionIndex);
-            el.setAttribute('aria-selected',String(idx === activeSuggestionIndex));
-        });
-        if(activeSuggestionIndex>=0)cityInput.setAttribute('aria-activedescendant',`weather-suggestion-${activeSuggestionIndex}`);
-    }
-
-    if (suggestionsBox) {
-        cityInput.addEventListener("input", () => {
-            const query = cityInput.value.trim();
-            clearTimeout(suggestTimer);
-            const requestId = ++latestSuggestId;
-
-            if (query.length < 2) {
-                hideSuggestions();
-                return;
-            }
-
-            suggestTimer = setTimeout(async () => {
-                try {
-                    const data = await fetchApi(`/weather/suggest?q=${encodeURIComponent(query)}`);
-                    if (requestId !== latestSuggestId) return;
-                    renderSuggestions(data.suggestions || []);
-                } catch {
-                    if (requestId === latestSuggestId) hideSuggestions();
-                }
-            }, 250);
-        });
-
-        // Use mousedown so clicking a suggestion works before input blur
-        suggestionsBox.addEventListener("mousedown", event => {
-            const itemEl = event.target.closest(".ac-item");
-            if (!itemEl) return;
-            event.preventDefault();
-            const idx = parseInt(itemEl.dataset.index, 10);
-            if (!isNaN(idx) && currentSuggestions[idx]) {
-                selectSuggestion(currentSuggestions[idx]);
-            }
-        });
-
-        // Keyboard navigation (ArrowDown, ArrowUp, Enter, Escape)
-        cityInput.addEventListener("keydown", event => {
-            if (suggestionsBox.hidden || !currentSuggestions.length) return;
-
-            if (event.key === "ArrowDown") {
-                event.preventDefault();
-                activeSuggestionIndex = (activeSuggestionIndex + 1) % currentSuggestions.length;
-                updateActiveSuggestion();
-            } else if (event.key === "ArrowUp") {
-                event.preventDefault();
-                activeSuggestionIndex = (activeSuggestionIndex - 1 + currentSuggestions.length) % currentSuggestions.length;
-                updateActiveSuggestion();
-            } else if (event.key === "Enter" && activeSuggestionIndex >= 0) {
-                event.preventDefault();
-                selectSuggestion(currentSuggestions[activeSuggestionIndex]);
-            } else if (event.key === "Escape") {
-                hideSuggestions();
-            }
-        });
-
-        document.addEventListener("click", event => {
-            if (!event.target.closest(".city-ac")) {
-                hideSuggestions();
-            }
-        });
-    }
-
-    // Keep the response locally so changing language can refresh date labels
-    // without another weather request or changing the typed city name.
-    let lastForecast = null;
-    function formatForecastDate(value) {
-        const date=new Date(String(value)+'T12:00:00Z');
-        if(Number.isNaN(date.getTime()))return String(value);
-        return new Intl.DateTimeFormat(window.CropI18n?.language || 'en', {
-            weekday:'short',day:'numeric',month:'short',timeZone:'UTC'
-        }).format(date);
-    }
-    function renderForecast(forecast) {
-            if (!forecast.days?.length) {
-                resultContainer.innerHTML = `<div class="panel">${renderEmptyPlaceholder('fa-cloud-sun','No forecast data is available for this location.')}</div>`;
-                return;
-            }
-            const locationParts = [forecast.location];
-            if (forecast.state && forecast.state.toLowerCase() !== String(forecast.location || "").toLowerCase()) {
-                locationParts.push(forecast.state);
-            }
-            if (forecast.country) {
-                locationParts.push(forecast.country);
-            }
-            const locationLabel = locationParts.filter(Boolean).join(", ");
-
-            const rowsHtml = (forecast.days || []).map(day => `
-                <tr>
-                    <td><time datetime="${escapeHtml(day.date)}" title="${escapeHtml(day.date)}">${escapeHtml(formatForecastDate(day.date))}</time></td>
-                    <td>${formatValue(day.min_temp_c)}</td>
-                    <td>${formatValue(day.max_temp_c)}</td>
-                    <td>${formatValue(day.humidity_percent, '%')}</td>
-                    <td>${formatValue(day.rain_mm)}</td>
-                    <td>${formatValue(day.rain_probability, '%')}</td>
-                </tr>
-            `).join("");
-
-            resultContainer.innerHTML = `
-                <div class="panel">
-                    <div class="inl" style="justify-content:space-between;align-items:center">
-                        <h3 style="margin:0"><i class="fa-solid fa-location-dot"></i> <span translate="no">${escapeHtml(locationLabel)}</span></h3>
-                        ${renderBadge("live", `<span>Source</span>: <span translate="no">${escapeHtml(forecast.source)}</span>`)}
-                    </div>
-                </div>
-
-                <div class="panel tw">
-                    <h3><i class="fa-solid fa-calendar-week"></i> 7-Day Forecast</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Min Temperature (°C)</th>
-                                <th>Max Temperature (°C)</th>
-                                <th>Humidity (%)</th>
-                                <th>Rainfall (mm)</th>
-                                <th>Rain Probability (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rowsHtml}
-                        </tbody>
-                    </table>
-                    <div class="note">${escapeHtml(forecast.note)}</div>
-                </div>
-            `;
-    }
-    document.addEventListener('languagechange', () => {
-        if(lastForecast)renderForecast(lastForecast);
-    });
-
-    // ---- Fetch and render 7-day forecast ----
-    formElement.onsubmit = function (event) {
-        event.preventDefault();
-        hideSuggestions();
-        lastForecast = null;
-        executeWithLoadingState(submitButton, async function () {
-            const city = cityInput.value.trim();
-            if (!city) throw new Error('Please enter a city, district, or state name.');
-            resultContainer.innerHTML = `
-                <div class="panel">
-                    ${renderEmptyPlaceholder('fa-spinner fa-spin','<span>Loading 7-day weather forecast...</span>')}
-                    <p translate="no">${escapeHtml(city)}</p>
-                </div>`;
-            lastForecast = await fetchApi(`/weather?city=${encodeURIComponent(city)}`);
-            renderForecast(lastForecast);
-        });
-    };
 };
 
 
@@ -1732,20 +1491,13 @@ pageControllers.weather = function () {
 // 5. APPLICATION BOOTSTRAPPER
 // ============================================================================
 
-pageControllers.login=()=>window.CropAccount.bindForm('login');
-pageControllers.register=()=>window.CropAccount.bindForm('register');
-pageControllers.history=()=>window.CropHistory.start();
-
-function initApp() {
+document.addEventListener("DOMContentLoaded", () => {
     // Mobile navigation burger menu toggle
     const burgerButton = getElement(".burger");
     if (burgerButton) {
         burgerButton.addEventListener("click", () => {
             const menu = getElement(".menu");
-            if (menu) {
-                const expanded=menu.classList.toggle("open");
-                burgerButton.setAttribute('aria-expanded',String(expanded));
-            }
+            if (menu) menu.classList.toggle("open");
         });
     }
 
@@ -1753,25 +1505,9 @@ function initApp() {
     const dropdownButtons = getAllElements(".dd > button");
     dropdownButtons.forEach(btn => {
         btn.addEventListener("click", event => {
-            const expanded=event.currentTarget.parentElement.classList.toggle("open");
-            event.currentTarget.setAttribute('aria-expanded',String(expanded));
+            event.currentTarget.parentElement.classList.toggle("open");
         });
     });
-
-    function closeNavigation(){
-        getElement('.menu')?.classList.remove('open');
-        burgerButton?.setAttribute('aria-expanded','false');
-        getAllElements('.dd').forEach(item=>item.classList.remove('open'));
-        dropdownButtons.forEach(button=>button.setAttribute('aria-expanded','false'));
-    }
-    document.addEventListener('languagechange',closeNavigation);
-    document.addEventListener('keydown',event=>{if(event.key==='Escape')closeNavigation();});
-    getAllElements('.menu a').forEach(link=>link.addEventListener('click',closeNavigation));
-    document.addEventListener('click',event=>{if(!event.target.closest('.nav'))closeNavigation();});
-    const nav=getElement('.nav');
-    if(nav&&window.ResizeObserver){
-        new ResizeObserver(()=>document.documentElement.style.setProperty('--navigation-height',nav.getBoundingClientRect().height+'px')).observe(nav);
-    }
 
     // Initialize controller matching the current page's data-page attribute
     const currentPageName = document.body.dataset.page;
@@ -1783,10 +1519,4 @@ function initApp() {
             showToast(err.message, "error");
         });
     }
-}
-
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initApp);
-} else {
-    initApp();
-}
+});

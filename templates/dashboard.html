@@ -7,7 +7,7 @@
 <div class="app-head">
     <div class="wrap">
         <h1>Dashboard</h1>
-        <p>Your overview of model performance and saved history.</p>
+        <p>Your overview of model performance metrics, quick tools, and recent local predictions.</p>
     </div>
 </div>
 
@@ -81,14 +81,10 @@
                 <div class="ico"><i class="fa-solid fa-gauge-high"></i></div>
                 <h3>Model Analytics</h3>
             </a>
-            <a class="card" href="/weather-forecast">
-                <div class="ico"><i class="fa-solid fa-cloud-sun-rain"></i></div>
-                <h3>Weather Forecast</h3>
-            </a>
         </div>
 
-        <!-- Charts & History Grid -->
-        <div class="grid g2" style="margin-top:30px">
+        <!-- Model comparison -->
+        <div style="margin-top:30px">
             <!-- Model Accuracy Comparison Chart -->
             <div class="panel">
                 <h3><i class="fa-solid fa-chart-column"></i> Model Comparison (CV vs Test)</h3>
@@ -97,25 +93,6 @@
                 </div>
             </div>
 
-            <!-- Recent Predictions Table -->
-            <div>
-                <div class="panel tw">
-                    <h3><i class="fa-solid fa-clock-rotate-left"></i> My history</h3>
-                    <table>
-                        <tbody id="hist"></tbody>
-                    </table>
-                    <a class="btn ghost sm" href="/history" style="margin-top:10px">View all history</a>
-                </div>
-
-                <div class="panel">
-                    <h3><i class="fa-solid fa-circle-info"></i> Good to Know</h3>
-                    <ul>
-                        <li>Use soil-test values from your official Soil Health Card where available.</li>
-                        <li>If you see OUT_OF_RANGE, re-check units before trusting any recommendation.</li>
-                        <li>Treat LOW_CONFIDENCE results as a shortlist rather than a definitive answer.</li>
-                    </ul>
-                </div>
-            </div>
         </div>
     </div>
 </main>

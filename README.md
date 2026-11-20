@@ -2,8 +2,6 @@
 
 AI crop recommendation (22 crops) with confidence, out-of-range detection and planning tools. FastAPI serves both the API and the website.
 
-User accounts and MongoDB history are grouped in [`user_history/`](user_history/README.md). Register or sign in, run a crop recommendation/soil analysis, then open **History** to reopen reports, reuse inputs or delete your own entries. Login accounts share history across devices using the same app/database. All twelve regional languages are supported for the new account/history interface. Local MongoDB defaults to `mongodb://127.0.0.1:27017`, database `crop_advisor`; configuration and tests are explained in the feature README.
-
 ## Honest scope notes
 - **Dataset:** the uploaded `Crop_recommendation.csv` has 2,200 rows, 22 crops, 7 features (N, P, K, temperature, humidity, pH, rainfall). The Feature Guide PDF describes a different dataset (12 crops, state/season/soil). **State, season and soil type are not ML inputs.** State is only used to filter market prices.
 - **Accuracy (~99.5%)** is genuine for this clean, well-separated dataset; real farm data will score lower.

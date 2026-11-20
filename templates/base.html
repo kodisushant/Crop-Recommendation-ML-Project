@@ -10,19 +10,16 @@
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap"
-    rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <!-- Custom Stylesheet -->
-    <link rel="stylesheet" href="/static/css/style.css?v=weather-language1">
-    <link rel="stylesheet" href="/user-history/static/style.css?v=1">
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 
-<body data-page="{{ page }}" data-analysis-mode="{{ 'soil' if soil_analysis else 'crop' }}">
+<body data-page="{{ page }}">
     <!-- Navigation Bar -->
     <header class="nav">
         <div class="wrap">
@@ -31,16 +28,11 @@
                 CROP ADVISOR
             </a>
             
-            <button class="burger" type="button" aria-label="Toggle navigation menu" aria-controls="main-menu" aria-expanded="false">
+            <button class="burger" aria-label="Toggle navigation menu">
                 <i class="fa-solid fa-bars"></i>
             </button>
 
-            <div class="language-picker">
-                <label for="language-select"><span aria-hidden="true">🌐</span> Language</label>
-                <select id="language-select" translate="no"></select>
-            </div>
-            
-            <ul class="menu" id="main-menu">
+            <ul class="menu">
                 {% block links %}
                 <li><a href="/">Home</a></li>
                 <li><a href="/dashboard">Dashboard</a></li>
@@ -48,16 +40,14 @@
                 
                 <!-- Tools Dropdown -->
                 <li class="dd">
-                    <button type="button" aria-expanded="false" aria-controls="tools-menu">
+                    <button type="button">
                         Tools <i class="fa-solid fa-chevron-down"></i>
                     </button>
-                    <div class="dd-m" id="tools-menu">
-                        <a href="/soil-analysis"><i class="fa-solid fa-vial"></i> Soil Analysis</a>
+                    <div class="dd-m">
                         <a href="/ideal-conditions"><i class="fa-solid fa-ruler-combined"></i> Ideal Conditions</a>
                         <a href="/land-check"><i class="fa-solid fa-map"></i> Land Suitability</a>
                         <a href="/fertilizer"><i class="fa-solid fa-flask"></i> Fertilizer Planning</a>
                         <a href="/market"><i class="fa-solid fa-chart-line"></i> Market Prices</a>
-                        <a href="/weather-forecast"><i class="fa-solid fa-cloud-sun-rain"></i> Weather Forecast</a>
                         <a href="/profit"><i class="fa-solid fa-indian-rupee-sign"></i> Profit Estimation</a>
                         <a href="/what-if"><i class="fa-solid fa-sliders"></i> What-If Analysis</a>
                         <a href="/rotation"><i class="fa-solid fa-rotate"></i> Crop Rotation</a>
@@ -65,14 +55,11 @@
                     </div>
                 </li>
                 {% endblock %}
-                <li><a href="/history">History</a></li>
-                <li class="account-nav"><a href="/login" id="account-link">Sign in</a><span id="account-name" translate="no" hidden></span><button type="button" id="sign-out" hidden>Sign out</button></li>
                 <li><a class="btn sm" href="/recommendation">Get Started</a></li>
             </ul>
         </div>
     </header>
 
-    <p id="language-notice" class="language-notice wrap" hidden aria-live="polite"></p>
     <!-- Main Dynamic Body Block -->
     {% block body %}{% endblock %}
 
@@ -90,7 +77,6 @@
                     <a href="/land-check">Land Suitability</a>
                     <a href="/fertilizer">Fertilizer Planning</a>
                     <a href="/market">Market Prices</a>
-                    <a href="/weather-forecast">Weather Forecast</a>
                 </div>
                 <div>
                     <h3>Useful Links</h3>
@@ -112,20 +98,12 @@
         </div>
     </footer>
 
-    <!-- JavaScript Dependencies -->
+    <!-- Toast Notification Container -->
     <div id="toasts" aria-live="polite"></div>
+
+    <!-- JavaScript Dependencies -->
     <script src="/static/js/chart.umd.js"></script>
-    <script src="/static/js/translations.js?v=1"></script>
-    <script src="/static/js/translations-complete.js?v=1"></script>
-    <script src="/static/js/translations-reports.js?v=1"></script>
-    <script src="/static/js/translations-messages.js?v=soil-analysis1"></script>
-    <script src="/static/js/translations-descriptions.js?v=1"></script>
-    <script src="/static/js/translations-weather.js?v=1"></script>
-    <script src="/user-history/static/translations.js?v=1"></script>
-    <script src="/static/js/i18n.js?v=weather-language1"></script>
-    <script src="/user-history/static/accounts.js?v=1"></script>
-    <script src="/user-history/static/history.js?v=1"></script>
-    <script src="/static/js/script.js?v=user-history1"></script>
+    <script src="/static/js/script.js"></script>
 </body>
 
 </html>

@@ -1,8 +1,9 @@
 """Crop Advisor - FastAPI backend. Serves the API (/docs) AND the website (templates + static)."""
 import os, time, logging, requests, numpy as np, pandas as pd
+from datetime import date, timedelta
 from pathlib import Path
-from contextlib import asynccontextmanager
 from typing import Optional, Dict, Literal
+import re
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,30 +16,13 @@ except ImportError:
     pass
 import predictor as P
 import crop_data as C
-from user_history.routes import router as user_router, close_storage, COOKIE, require_same_origin, save_prediction_history
-
-
-@asynccontextmanager
-async def lifespan(app):
-    yield
-    close_storage()
 
 BASE = Path(__file__).parent
 log = logging.getLogger("crop-advisor")
-app = FastAPI(title="Crop Advisor API", version="1.0", lifespan=lifespan,
+app = FastAPI(title="Crop Advisor API", version="1.0",
               description="AI crop recommendation with confidence, out-of-range detection and planning tools.")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
-app.include_router(user_router)
-app.mount("/user-history/static", StaticFiles(directory=BASE / "user_history" / "static"), name="user-history-assets")
-
-
-@app.middleware("http")
-async def private_pages_no_cache(request: Request, call_next):
-    response = await call_next(request)
-    if request.url.path.startswith("/api/") or request.url.path in ("/history", "/login", "/register", "/predict"):
-        response.headers["Cache-Control"] = "no-store"
-    return response
-templates = Jinja2Templates(directory=[BASE / "templates", BASE / "user_history" / "templates"])
+templates = Jinja2Templates(directory=BASE / "templates")
 FEATURES = P.FEATURES
 DF = P.DF
 API_KEY = os.getenv("DATA_GOV_API_KEY", "")
@@ -63,6 +47,17 @@ class Conditions(BaseModel):
     ph: float = Field(..., ge=0, le=14)
     rainfall: float = Field(..., ge=0, le=1000, description="mm")
     state: Optional[str] = Field(None, description="Location only - NOT an ML input")
+
+class DistrictLocation(BaseModel):
+    state: str = Field(..., min_length=2, max_length=80)
+    district: str = Field(..., min_length=2, max_length=120)
+
+class RecommendationRequest(BaseModel):
+    N: float = Field(..., ge=0, le=300)
+    P: float = Field(..., ge=0, le=300)
+    K: float = Field(..., ge=0, le=400)
+    ph: float = Field(..., ge=0, le=14)
+    location: DistrictLocation
 
 class Change(BaseModel):
     mode: Literal["set", "add", "pct"] = "set"
@@ -122,20 +117,13 @@ def run_predict(v):
 
 # ---------- pages ----------
 PAGES = {"": "index", "dashboard": "dashboard", "recommendation": "recommendation", "ideal-conditions": "ideal_conditions",
-         "land-check": "land_check", "fertilizer": "fertilizer", "market": "market", "weather-forecast": "weather",
-         "profit": "profit", "what-if": "what_if", "rotation": "rotation", "model-performance": "model_performance",
-         "history": "history", "login": "login", "register": "register"}
+         "land-check": "land_check", "fertilizer": "fertilizer", "market": "market", "profit": "profit",
+         "what-if": "what_if", "rotation": "rotation", "model-performance": "model_performance"}
 def _page(name):
     def h(request: Request): return templates.TemplateResponse(request, f"{name}.html", {"page": name})
     return h
 for path, name in PAGES.items():
     app.add_api_route("/" + path, _page(name), methods=["GET"], include_in_schema=False)
-
-@app.get("/soil-analysis", include_in_schema=False)
-def soil_analysis(request: Request):
-    # Reuse the existing inputs and model; only the presentation changes.
-    return templates.TemplateResponse(request, "recommendation.html",
-                                      {"page": "recommendation", "soil_analysis": True})
 
 @app.get("/health", include_in_schema=False)
 def health(): return {"status": "ok"}
@@ -152,6 +140,12 @@ def meta():
             "note": "State, season and soil type are NOT model inputs (not in the dataset)."}
 
 _states = {"t": 0, "data": None}
+_weather_cache = {}
+RAINFALL_PERIOD_DAYS = 365
+MODEL_RAINFALL_MIN = float(P.ood["min"]["rainfall"])
+MODEL_RAINFALL_MAX = float(P.ood["max"]["rainfall"])
+_districts_cache = {"t": 0, "data": None}
+DISTRICTS_DATA_URL = "https://raw.githubusercontent.com/codingmation/indian-states-districts/main/data/india_states_districts.min.json"
 @app.get("/states", tags=["General"])
 def states():
     """Indian states/UTs. Tries the data.gov.in Agmarknet dataset (needs key); falls back to a local list."""
@@ -170,6 +164,108 @@ def states():
     _states.update(t=time.time(), data=out)
     return out
 
+def normalized_place_name(value: str):
+    return re.sub(r"[^a-z]", "", value.lower().replace("&", "and").replace("unionterritory", "").replace("ut", ""))
+
+def district_data():
+    """Load the complete India state/district catalog and cache it for one day."""
+    if _districts_cache["data"] and time.time() - _districts_cache["t"] < 86400:
+        return _districts_cache["data"]
+    try:
+        response = requests.get(DISTRICTS_DATA_URL, timeout=15)
+        response.raise_for_status()
+        catalog = response.json()
+        if isinstance(catalog, dict):
+            catalog = catalog.get("states", [])
+        data = {
+            normalized_place_name(row["name"]): sorted(
+                district["name"] if isinstance(district, dict) else district
+                for district in row["districts"]
+            )
+            for row in catalog
+        }
+    except (requests.RequestException, KeyError, TypeError, ValueError):
+        raise HTTPException(503, "District list is temporarily unavailable. Please try again.")
+    _districts_cache.update(t=time.time(), data=data)
+    return data
+
+@app.get("/districts", tags=["General"])
+def districts(state: str):
+    """Return all districts for the selected State / UT."""
+    state = state.strip()
+    if state not in C.STATES:
+        raise HTTPException(422, "Choose a valid State / UT")
+    requested = normalized_place_name(state)
+    catalog = district_data()
+    match = next((districts for name, districts in catalog.items() if name == requested or requested in name or name in requested), None)
+    if match is None:
+        raise HTTPException(404, "No district list is available for that State / UT")
+    return match
+
+def district_coordinates(location: DistrictLocation):
+    """Resolve a selected Indian district to coordinates for the weather API."""
+    try:
+        response = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": location.district, "count": 20, "language": "en", "format": "json", "countryCode": "IN"},
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        raise HTTPException(503, "District location lookup is temporarily unavailable. Please try again.")
+
+    wanted = normalized_place_name(location.state)
+    for place in response.json().get("results", []):
+        admin1 = normalized_place_name(place.get("admin1") or "")
+        if place.get("country_code") == "IN" and (admin1 == wanted or wanted in admin1 or admin1 in wanted):
+            return float(place["latitude"]), float(place["longitude"])
+    raise HTTPException(422, "Could not locate that district. Please choose another district from the list.")
+
+def current_weather(latitude: float, longitude: float):
+    """Fetch current weather and a 365-day precipitation total for a district."""
+    key = (round(latitude, 3), round(longitude, 3))
+    hit = _weather_cache.get(key)
+    if hit and time.time() - hit["t"] < 15 * 60:
+        return hit["data"]
+    try:
+        response = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={"latitude": latitude, "longitude": longitude,
+                    "current": "temperature_2m,relative_humidity_2m,precipitation", "timezone": "auto"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        current = response.json()["current"]
+        end_date = date.today() - timedelta(days=1)
+        start_date = end_date - timedelta(days=RAINFALL_PERIOD_DAYS - 1)
+        rainfall_response = requests.get(
+            "https://archive-api.open-meteo.com/v1/archive",
+            params={"latitude": latitude, "longitude": longitude, "daily": "precipitation_sum",
+                    "start_date": start_date.isoformat(), "end_date": end_date.isoformat(), "timezone": "auto"},
+            timeout=20,
+        )
+        rainfall_response.raise_for_status()
+        daily_rainfall = rainfall_response.json()["daily"]["precipitation_sum"]
+        annual_rainfall = round(sum(float(value or 0) for value in daily_rainfall), 1)
+        monthly_rainfall = annual_rainfall / 12
+        # The trained rainfall feature is on a monthly-scale (20.2–298.6 mm),
+        # while the weather API returns a 365-day total. Convert before model use
+        # and use the model's supported maximum whenever the normalized value is
+        # outside its learned range, so rainfall alone cannot reject a request.
+        rainfall_outside_model_range = not MODEL_RAINFALL_MIN <= monthly_rainfall <= MODEL_RAINFALL_MAX
+        model_rainfall = MODEL_RAINFALL_MAX if rainfall_outside_model_range else monthly_rainfall
+        data = {"temperature": float(current["temperature_2m"]),
+                "humidity": float(current["relative_humidity_2m"]),
+                "rainfall": round(model_rainfall, 1), "annual_rainfall": annual_rainfall,
+                "monthly_rainfall": round(monthly_rainfall, 1),
+                "rainfall_capped": rainfall_outside_model_range,
+                "rainfall_maximum": round(MODEL_RAINFALL_MAX, 1),
+                "rainfall_period_days": RAINFALL_PERIOD_DAYS, "observed_at": current["time"], "source": "Open-Meteo"}
+    except (requests.RequestException, KeyError, TypeError, ValueError):
+        raise HTTPException(503, "Current weather is temporarily unavailable. Please try again.")
+    _weather_cache[key] = {"t": time.time(), "data": data}
+    return data
+
 @app.get("/crops", tags=["General"])
 def crops():
     return [{"crop": c, "family": d["family"], "seasons": d["seasons"], "duration_days": d["duration_days"],
@@ -184,12 +280,13 @@ def crop_detail(crop: str):
 
 # ---------- prediction ----------
 @app.post("/predict", tags=["Prediction"])
-def predict(c: Conditions, request: Request):
-    if request.cookies.get(COOKIE):
-        require_same_origin(request)
-    result = run_predict(vals(c))
-    result["history"] = save_prediction_history(request, c.model_dump(), result.copy())
-    return result
+def predict(r: RecommendationRequest):
+    latitude, longitude = district_coordinates(r.location)
+    weather = current_weather(latitude, longitude)
+    conditions = Conditions(N=r.N, P=r.P, K=r.K, ph=r.ph, state=r.location.state,
+                            temperature=weather["temperature"], humidity=weather["humidity"], rainfall=weather["rainfall"])
+    return {**run_predict(vals(conditions)), "location": {"state": r.location.state, "district": r.location.district},
+            "weather": weather}
 
 def apply_changes(base, changes):
     new = dict(base)
@@ -316,293 +413,6 @@ def market(crop: str, state: Optional[str] = None):
     elif not API_KEY: data["message"] += " (Set DATA_GOV_API_KEY to enable live prices.)"
     _mcache[key] = {"t": time.time(), "data": data}
     return {**data, "cached": False}
-
-
-# ---------- weather forecast (Open-Meteo, no API key required) ----------
-INDIAN_STATE_NAMES = {s.lower() for s in C.STATES} | {
-    "orissa", "pondicherry", "jammu & kashmir", "andaman & nicobar islands",
-    "dadra & nagar haveli", "daman & diu", "daman and diu", "new delhi"
-}
-
-
-def _geocode_photon(query: str):
-    """Fallback geocoder (Photon / OpenStreetMap) that supports states, districts, cities, and towns."""
-    resp = requests.get(
-        "https://photon.komoot.io/api/",
-        params={"q": query, "limit": 5, "lang": "en"},
-        headers={"User-Agent": "CropAdvisor/1.0"},
-        timeout=10,
-    )
-    resp.raise_for_status()
-    features = resp.json().get("features") or []
-    if not features:
-        return None
-
-    # Prefer a match inside India when multiple places share the same name
-    in_matches = [f for f in features if f.get("properties", {}).get("countrycode") == "IN"]
-    chosen = in_matches[0] if in_matches else features[0]
-
-    lon, lat = chosen["geometry"]["coordinates"]
-    props = chosen.get("properties") or {}
-    return {
-        "latitude": lat,
-        "longitude": lon,
-        "name": props.get("name") or props.get("city") or props.get("state") or query,
-        "state": props.get("state") or "",
-        "country": props.get("country") or "",
-        "country_code": props.get("countrycode") or "",
-    }
-
-
-def _geocode_open_meteo(query: str):
-    """Primary geocoder using Open-Meteo Geocoding API (no API key required)."""
-    resp = requests.get(
-        "https://geocoding-api.open-meteo.com/v1/search",
-        params={"name": query, "count": 5, "language": "en", "format": "json"},
-        timeout=10,
-    )
-    resp.raise_for_status()
-    results = resp.json().get("results") or []
-    if not results:
-        return None
-
-    # Prefer an Indian match when multiple places share the same name (e.g. Hyderabad, Nagpur)
-    in_matches = [r for r in results if r.get("country_code") == "IN"]
-    chosen = in_matches[0] if in_matches else results[0]
-    return {
-        "latitude": chosen["latitude"],
-        "longitude": chosen["longitude"],
-        "name": chosen.get("name") or query,
-        "state": chosen.get("admin1") or "",
-        "country": chosen.get("country") or "",
-        "country_code": chosen.get("country_code") or "",
-    }
-
-
-def geocode_location(city_name: str):
-    """
-    Resolve a city, town, district, or Indian state/UT name to coordinates.
-    Uses Open-Meteo Geocoding API and falls back to Photon for states, districts,
-    and multi-part queries (e.g. 'Telangana', 'East Godavari', 'Warangal, Telangana').
-    """
-    lower_name = city_name.lower()
-    is_state_or_compound = (
-        lower_name in INDIAN_STATE_NAMES
-        or "," in lower_name
-        or "district" in lower_name
-    )
-
-    # For Indian states/UTs and district/comma queries, Photon handles administrative boundaries reliably
-    if is_state_or_compound:
-        try:
-            place = _geocode_photon(city_name)
-            if place:
-                return place
-        except requests.RequestException as e:
-            log.warning("Photon geocoding failed for '%s': %s", city_name, e)
-
-    # Try Open-Meteo Geocoding API first for cities and towns
-    open_meteo_place = None
-    open_meteo_error = None
-    try:
-        open_meteo_place = _geocode_open_meteo(city_name)
-    except requests.Timeout:
-        open_meteo_error = "timeout"
-    except requests.RequestException as e:
-        log.warning("Open-Meteo geocoding failed for '%s': %s", city_name, e)
-        open_meteo_error = "unavailable"
-
-    # If Open-Meteo found an Indian location, use it right away
-    if open_meteo_place and open_meteo_place["country_code"] == "IN":
-        return open_meteo_place
-
-    # Otherwise check Photon (covers Indian districts like East Godavari, Kanyakumari, Paschim Medinipur)
-    try:
-        photon_place = _geocode_photon(city_name)
-        if photon_place and photon_place["country_code"] == "IN":
-            return photon_place
-        if open_meteo_place:
-            return open_meteo_place
-        if photon_place:
-            return photon_place
-    except requests.Timeout:
-        if open_meteo_place:
-            return open_meteo_place
-        if open_meteo_error == "timeout":
-            raise HTTPException(504, "Weather location service timed out. Please try again.")
-    except requests.RequestException as e:
-        log.warning("Photon fallback geocoding failed for '%s': %s", city_name, e)
-        if open_meteo_place:
-            return open_meteo_place
-
-    if open_meteo_error == "timeout":
-        raise HTTPException(504, "Weather location service timed out. Please try again.")
-    if open_meteo_error == "unavailable":
-        raise HTTPException(502, "Weather location service is currently unavailable. Please try again later.")
-
-    return None
-
-
-@app.get("/weather/suggest", tags=["Weather"])
-def weather_suggest(q: str = ""):
-    """Return live city, district, and state autocomplete suggestions (no API key required)."""
-    query = q.strip()
-    if len(query) < 2:
-        return {"suggestions": []}
-
-    suggestions = []
-    seen_labels = set()
-
-    def add_suggestion(label: str, value: str):
-        key = label.lower()
-        if key not in seen_labels:
-            seen_labels.add(key)
-            suggestions.append({"label": label, "value": value})
-
-    # 1. Include matching Indian states/UTs first for instant state autocomplete
-    query_lower = query.lower()
-    for state_name in C.STATES:
-        if query_lower in state_name.lower():
-            add_suggestion(f"{state_name}, India", state_name)
-
-    # 2. Fetch matching cities and towns from Open-Meteo Geocoding API
-    try:
-        resp = requests.get(
-            "https://geocoding-api.open-meteo.com/v1/search",
-            params={"name": query, "count": 8, "language": "en", "format": "json"},
-            timeout=5,
-        )
-        resp.raise_for_status()
-        results = resp.json().get("results") or []
-
-        # Show Indian matches before international matches
-        results.sort(key=lambda r: 0 if r.get("country_code") == "IN" else 1)
-
-        for item in results:
-            name = item.get("name") or ""
-            admin1 = item.get("admin1") or ""
-            country = item.get("country") or ""
-            if not name:
-                continue
-
-            parts = [name]
-            if admin1 and admin1.lower() != name.lower():
-                parts.append(admin1)
-            if country:
-                parts.append(country)
-            label = ", ".join(parts)
-
-            value = f"{name}, {admin1}" if admin1 and admin1.lower() != name.lower() else name
-            add_suggestion(label, value)
-    except requests.RequestException as e:
-        log.warning("Open-Meteo suggest failed for '%s': %s", query, e)
-
-    # 3. If fewer than 3 suggestions found, also check Photon (covers Indian districts)
-    if len(suggestions) < 3:
-        try:
-            resp = requests.get(
-                "https://photon.komoot.io/api/",
-                params={"q": query, "limit": 5, "lang": "en"},
-                headers={"User-Agent": "CropAdvisor/1.0"},
-                timeout=5,
-            )
-            resp.raise_for_status()
-            features = resp.json().get("features") or []
-            features.sort(key=lambda f: 0 if f.get("properties", {}).get("countrycode") == "IN" else 1)
-
-            for feat in features:
-                props = feat.get("properties") or {}
-                name = props.get("name") or props.get("city") or ""
-                state = props.get("state") or ""
-                country = props.get("country") or ""
-                if not name:
-                    continue
-
-                parts = [name]
-                if state and state.lower() != name.lower():
-                    parts.append(state)
-                if country:
-                    parts.append(country)
-                label = ", ".join(parts)
-
-                value = f"{name}, {state}" if state and state.lower() != name.lower() else name
-                add_suggestion(label, value)
-        except requests.RequestException as e:
-            log.warning("Photon suggest failed for '%s': %s", query, e)
-
-    return {"suggestions": suggestions[:8]}
-
-
-@app.get("/weather", tags=["Weather"])
-def weather(city: str = "Hyderabad"):
-    """Fetch a 7-day weather forecast for any city, town, district, or state using Open-Meteo."""
-    city_name = city.strip()
-    if not city_name:
-        raise HTTPException(400, "Please enter a city, district, or state name.")
-
-    # Step 1: Convert location name to latitude and longitude
-    place = geocode_location(city_name)
-    if not place:
-        raise HTTPException(404, f"Location '{city_name}' not found. Please check the spelling and try another city, district, or state.")
-
-    latitude = place["latitude"]
-    longitude = place["longitude"]
-    location_name = place["name"]
-    state_name = place["state"]
-    country_name = place["country"]
-
-    # Step 2: Request the 7-day daily weather forecast using latitude and longitude
-    try:
-        forecast_response = requests.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude": latitude,
-                "longitude": longitude,
-                "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,relative_humidity_2m_mean",
-                "timezone": "auto",
-                "forecast_days": 7,
-            },
-            timeout=10,
-        )
-        forecast_response.raise_for_status()
-        forecast_data = forecast_response.json()
-    except requests.Timeout:
-        raise HTTPException(504, "Weather forecast service timed out. Please try again.")
-    except requests.RequestException as e:
-        log.warning("weather forecast API failed: %s", e)
-        raise HTTPException(502, "Weather forecast service is currently unavailable. Please try again later.")
-
-    # Step 3: Process the daily arrays into a clean list of 7 forecast day objects
-    daily = forecast_data.get("daily") or {}
-    dates = daily.get("time") or []
-    max_temps = daily.get("temperature_2m_max") or []
-    min_temps = daily.get("temperature_2m_min") or []
-    rain_amounts = daily.get("precipitation_sum") or []
-    rain_probs = daily.get("precipitation_probability_max") or []
-    humidities = daily.get("relative_humidity_2m_mean") or []
-
-    if not dates:
-        raise HTTPException(502, "Weather forecast data could not be read from Open-Meteo.")
-
-    days = []
-    for i in range(len(dates)):
-        days.append({
-            "date": dates[i],
-            "max_temp_c": max_temps[i] if i < len(max_temps) else None,
-            "min_temp_c": min_temps[i] if i < len(min_temps) else None,
-            "humidity_percent": humidities[i] if i < len(humidities) else None,
-            "rain_mm": rain_amounts[i] if i < len(rain_amounts) else None,
-            "rain_probability": rain_probs[i] if i < len(rain_probs) else None,
-        })
-
-    return {
-        "location": location_name,
-        "state": state_name,
-        "country": country_name,
-        "days": days,
-        "source": "Open-Meteo",
-        "note": "Forecast is approximate. Check local weather alerts before farm operations.",
-    }
 
 
 # ---------- profit ----------
