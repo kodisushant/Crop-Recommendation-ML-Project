@@ -26,9 +26,9 @@
                     </select>
                 </div>
 
-                <!-- Land & Climate Conditions -->
+                <!-- Soil Nutrients & Properties -->
                 <div class="panel">
-                    <h3><i class="fa-solid fa-seedling"></i> Your land conditions</h3>
+                    <h3><i class="fa-solid fa-seedling"></i> Soil Nutrients &amp; Properties</h3>
                     <div class="fg">
                         <!-- Nitrogen -->
                         <div>
@@ -69,37 +69,28 @@
                             <div class="hint">Acidity (7 = neutral) · 0–14</div>
                             <div class="err" id="e-f-ph"></div>
                         </div>
-
-                        <!-- Temperature -->
-                        <div>
-                            <label for="f-temperature">
-                                <i class="fa-solid fa-temperature-half"></i> Temperature <small>(°C)</small>
-                            </label>
-                            <input type="number" id="f-temperature" name="temperature" min="-5" max="55" step="0.1" value="20.9" required>
-                            <div class="hint">Average temperature · -5–55</div>
-                            <div class="err" id="e-f-temperature"></div>
-                        </div>
-
-                        <!-- Humidity -->
-                        <div>
-                            <label for="f-humidity">
-                                <i class="fa-solid fa-cloud"></i> Humidity <small>(%)</small>
-                            </label>
-                            <input type="number" id="f-humidity" name="humidity" min="0" max="100" step="0.1" value="82" required>
-                            <div class="hint">Relative humidity · 0–100</div>
-                            <div class="err" id="e-f-humidity"></div>
-                        </div>
-
-                        <!-- Rainfall -->
-                        <div>
-                            <label for="f-rainfall">
-                                <i class="fa-solid fa-cloud-rain"></i> Rainfall <small>(mm)</small>
-                            </label>
-                            <input type="number" id="f-rainfall" name="rainfall" min="0" max="1000" step="0.1" value="203" required>
-                            <div class="hint">Rainfall · 0–1000</div>
-                            <div class="err" id="e-f-rainfall"></div>
-                        </div>
                     </div>
+                </div>
+
+                <!-- Location & Current Weather -->
+                <div class="panel">
+                    <h3><i class="fa-solid fa-location-dot"></i> Location &amp; Current Weather</h3>
+
+                    <!-- State Input with Auto Suggestion -->
+                    <div class="city-ac" style="width:100%;max-width:none;margin-bottom:14px">
+                        <label for="state">State / UT</label>
+                        <input type="text" id="state" name="state" autocomplete="off" placeholder="Type or click to search State (e.g. Telangana, Maharashtra)" role="combobox" aria-autocomplete="list" aria-controls="state-suggestions" aria-expanded="false" required>
+                        <ul id="state-suggestions" class="ac-list" role="listbox" aria-label="State suggestions" hidden></ul>
+                    </div>
+
+                    <!-- District Input with Auto Suggestion -->
+                    <div class="city-ac" style="width:100%;max-width:none">
+                        <label for="district">District</label>
+                        <input type="text" id="district" name="district" autocomplete="off" placeholder="Type or click to search District (e.g. Hyderabad, Warangal)" role="combobox" aria-autocomplete="list" aria-controls="district-suggestions" aria-expanded="false" required>
+                        <ul id="district-suggestions" class="ac-list" role="listbox" aria-label="District suggestions" hidden></ul>
+                    </div>
+
+                    <div class="hint">Type or click to see auto suggestions for State and District. Temperature, humidity, and rainfall are retrieved automatically when you check suitability.</div>
                 </div>
 
                 <!-- Submit Button -->

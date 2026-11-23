@@ -72,11 +72,22 @@
                 <!-- Group 3: Location and automatic weather -->
                 <div class="panel">
                     <h3><i class="fa-solid fa-location-dot"></i> Location &amp; Current Weather</h3>
-                    <label for="state">State / UT</label>
-                    <select id="state" required><option value="">Select a State / UT</option></select>
-                    <label for="district">District</label>
-                    <select id="district" disabled required><option value="">Select a State / UT first</option></select>
-                    <div class="hint">Districts load automatically when you select a state. Temperature, humidity, and current precipitation are retrieved automatically when you recommend.</div>
+
+                    <!-- State Input with Auto Suggestion -->
+                    <div class="city-ac" style="width:100%;max-width:none;margin-bottom:14px">
+                        <label for="state">State / UT</label>
+                        <input type="text" id="state" name="state" autocomplete="off" placeholder="Type or click to search State (e.g. Telangana, Maharashtra)" role="combobox" aria-autocomplete="list" aria-controls="state-suggestions" aria-expanded="false" required>
+                        <ul id="state-suggestions" class="ac-list" role="listbox" aria-label="State suggestions" hidden></ul>
+                    </div>
+
+                    <!-- District Input with Auto Suggestion -->
+                    <div class="city-ac" style="width:100%;max-width:none">
+                        <label for="district">District</label>
+                        <input type="text" id="district" name="district" autocomplete="off" placeholder="Type or click to search District (e.g. Hyderabad, Warangal)" role="combobox" aria-autocomplete="list" aria-controls="district-suggestions" aria-expanded="false" required>
+                        <ul id="district-suggestions" class="ac-list" role="listbox" aria-label="District suggestions" hidden></ul>
+                    </div>
+
+                    <div class="hint">Type or click to see auto suggestions for State and District. Temperature, humidity, and rainfall are retrieved automatically when you recommend.</div>
                 </div>
 
                 <!-- Action Buttons -->

@@ -127,6 +127,20 @@ function capitalizeFirstLetter(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+/** Safely escapes HTML special characters to prevent XSS and rendering errors */
+function escapeHtml(text) {
+    return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+/** Formats a numeric value with a fallback string when null or undefined */
+function formatValue(value, fallback = "–") {
+    return value === null || value === undefined ? fallback : value;
+}
+
 /** Formats a numeric value into Indian Rupee currency string (e.g. ₹2,369) */
 function formatRupees(amount) {
     if (isNaN(amount) || amount === null) return "₹0";
@@ -391,6 +405,231 @@ function restoreFieldInputs(featureKeys, prefix = "f-") {
     });
 }
 
+/**
+ * Sets up State and District auto-suggestions on input elements.
+ * Simple, beginner-friendly helper reusable across Recommendation and Land Check pages.
+ */
+function setupLocationAutocomplete({ stateInput, stateSuggestions, districtInput, districtSuggestions }) {
+    let allStates = [];
+    let currentDistricts = [];
+    let activeStateIndex = -1;
+    let activeDistrictIndex = -1;
+
+    function hideStateSuggestions() {
+        if (!stateSuggestions) return;
+        stateSuggestions.hidden = true;
+        stateSuggestions.innerHTML = "";
+        activeStateIndex = -1;
+        stateInput?.setAttribute("aria-expanded", "false");
+    }
+
+    function hideDistrictSuggestions() {
+        if (!districtSuggestions) return;
+        districtSuggestions.hidden = true;
+        districtSuggestions.innerHTML = "";
+        activeDistrictIndex = -1;
+        districtInput?.setAttribute("aria-expanded", "false");
+    }
+
+    async function loadDistricts(stateName) {
+        if (!stateName) {
+            currentDistricts = [];
+            return [];
+        }
+        try {
+            currentDistricts = await fetchApi(`/districts?state=${encodeURIComponent(stateName)}`);
+            return currentDistricts;
+        } catch {
+            currentDistricts = [];
+            return [];
+        }
+    }
+
+    function renderStates(list) {
+        if (!stateSuggestions) return;
+        activeStateIndex = -1;
+        if (!list.length) {
+            hideStateSuggestions();
+            return;
+        }
+        stateSuggestions.innerHTML = list.map((st, idx) => `
+            <li class="ac-item" role="option" data-value="${escapeHtml(st)}" data-index="${idx}">
+                <i class="fa-solid fa-location-dot" style="color:var(--fresh);margin-right:6px"></i>${escapeHtml(st)}
+            </li>
+        `).join("");
+        stateSuggestions.hidden = false;
+        stateInput?.setAttribute("aria-expanded", "true");
+    }
+
+    function renderDistricts(list) {
+        if (!districtSuggestions) return;
+        activeDistrictIndex = -1;
+        if (!list.length) {
+            hideDistrictSuggestions();
+            return;
+        }
+        districtSuggestions.innerHTML = list.map((dst, idx) => `
+            <li class="ac-item" role="option" data-value="${escapeHtml(dst)}" data-index="${idx}">
+                <i class="fa-solid fa-map-pin" style="color:var(--forest);margin-right:6px"></i>${escapeHtml(dst)}
+            </li>
+        `).join("");
+        districtSuggestions.hidden = false;
+        districtInput?.setAttribute("aria-expanded", "true");
+    }
+
+    async function selectState(st) {
+        if (!st) return;
+        if (stateInput) stateInput.value = st;
+        hideStateSuggestions();
+        if (districtInput) {
+            districtInput.value = "";
+            districtInput.placeholder = `Loading districts for ${st}…`;
+        }
+        showToast(`Loading districts for ${st}…`);
+        const dists = await loadDistricts(st);
+        if (districtInput) {
+            districtInput.placeholder = `Type or click to search District (e.g. Hyderabad)`;
+            districtInput.focus();
+            renderDistricts(dists.slice(0, 15));
+        }
+    }
+
+    function selectDistrict(dst) {
+        if (!dst || dst === "none") return;
+        if (districtInput) districtInput.value = dst;
+        hideDistrictSuggestions();
+    }
+
+    // State input events
+    if (stateInput && stateSuggestions) {
+        const filterAndShowStates = async () => {
+            if (!allStates.length) {
+                try {
+                    const resp = await fetchApi("/states");
+                    allStates = resp.states || [];
+                } catch {
+                    allStates = [];
+                }
+            }
+            const query = (stateInput.value || "").trim().toLowerCase();
+            const filtered = query
+                ? allStates.filter(s => s.toLowerCase().includes(query))
+                : allStates;
+            renderStates(filtered.slice(0, 10));
+        };
+
+        stateInput.addEventListener("input", filterAndShowStates);
+        stateInput.addEventListener("focus", filterAndShowStates);
+        stateInput.addEventListener("click", filterAndShowStates);
+
+        stateSuggestions.addEventListener("mousedown", event => {
+            const item = event.target.closest(".ac-item");
+            if (!item) return;
+            event.preventDefault();
+            const val = item.dataset.value;
+            if (val) selectState(val);
+        });
+
+        stateInput.addEventListener("keydown", event => {
+            if (stateSuggestions.hidden) return;
+            const items = getAllElements(".ac-item", stateSuggestions);
+            if (!items.length) return;
+            if (event.key === "ArrowDown") {
+                event.preventDefault();
+                activeStateIndex = (activeStateIndex + 1) % items.length;
+                items.forEach((el, i) => el.classList.toggle("active", i === activeStateIndex));
+            } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                activeStateIndex = (activeStateIndex - 1 + items.length) % items.length;
+                items.forEach((el, i) => el.classList.toggle("active", i === activeStateIndex));
+            } else if (event.key === "Enter" && activeStateIndex >= 0) {
+                event.preventDefault();
+                const val = items[activeStateIndex].dataset.value;
+                if (val) selectState(val);
+            } else if (event.key === "Escape") {
+                hideStateSuggestions();
+            }
+        });
+    }
+
+    // District input events
+    if (districtInput && districtSuggestions) {
+        const filterAndShowDistricts = async () => {
+            const st = (stateInput?.value || "").trim();
+            if (!st) {
+                districtSuggestions.innerHTML = `<li class="ac-item" data-value="none" style="color:var(--muted);cursor:default">Please select a State / UT first</li>`;
+                districtSuggestions.hidden = false;
+                districtInput?.setAttribute("aria-expanded", "true");
+                return;
+            }
+            if (!currentDistricts.length) {
+                districtSuggestions.innerHTML = `<li class="ac-item" data-value="none" style="color:var(--muted);cursor:default">Loading districts…</li>`;
+                districtSuggestions.hidden = false;
+                await loadDistricts(st);
+            }
+            const query = (districtInput.value || "").trim().toLowerCase();
+            const filtered = query
+                ? currentDistricts.filter(d => d.toLowerCase().includes(query))
+                : currentDistricts;
+            renderDistricts(filtered.slice(0, 15));
+        };
+
+        districtInput.addEventListener("input", filterAndShowDistricts);
+        districtInput.addEventListener("focus", filterAndShowDistricts);
+        districtInput.addEventListener("click", filterAndShowDistricts);
+
+        districtSuggestions.addEventListener("mousedown", event => {
+            const item = event.target.closest(".ac-item");
+            if (!item) return;
+            event.preventDefault();
+            const val = item.dataset.value;
+            if (val && val !== "none") selectDistrict(val);
+        });
+
+        districtInput.addEventListener("keydown", event => {
+            if (districtSuggestions.hidden) return;
+            const items = getAllElements(".ac-item", districtSuggestions);
+            if (!items.length) return;
+            if (event.key === "ArrowDown") {
+                event.preventDefault();
+                activeDistrictIndex = (activeDistrictIndex + 1) % items.length;
+                items.forEach((el, i) => el.classList.toggle("active", i === activeDistrictIndex));
+            } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                activeDistrictIndex = (activeDistrictIndex - 1 + items.length) % items.length;
+                items.forEach((el, i) => el.classList.toggle("active", i === activeDistrictIndex));
+            } else if (event.key === "Enter" && activeDistrictIndex >= 0) {
+                event.preventDefault();
+                const val = items[activeDistrictIndex].dataset.value;
+                if (val && val !== "none") selectDistrict(val);
+            } else if (event.key === "Escape") {
+                hideDistrictSuggestions();
+            }
+        });
+    }
+
+    // Close on click outside
+    document.addEventListener("click", event => {
+        if (!event.target.closest(".city-ac")) {
+            hideStateSuggestions();
+            hideDistrictSuggestions();
+        }
+    });
+
+    return {
+        hideAll: () => {
+            hideStateSuggestions();
+            hideDistrictSuggestions();
+        },
+        loadDistricts,
+        setStateAndDistrict: async (st, dst) => {
+            if (stateInput) stateInput.value = st;
+            await loadDistricts(st);
+            if (districtInput) districtInput.value = dst;
+        }
+    };
+}
+
 
 // ============================================================================
 // 4. PAGE CONTROLLER IMPLEMENTATIONS
@@ -467,57 +706,58 @@ pageControllers.dashboard = async function () {
 // 4.3 Crop Recommendation Page
 // ----------------------------------------------------------------------------
 pageControllers.recommendation = async function () {
-    const stateSelect = getElement("#state");
+    const stateInput = getElement("#state");
+    const stateSuggestions = getElement("#state-suggestions");
     const districtInput = getElement("#district");
+    const districtSuggestions = getElement("#district-suggestions");
     const fillExampleBtn = getElement("#fill-example");
     const formElement = getElement("#predict-form");
 
-    // 1. Populate the location picker and restore only the four manual soil inputs.
-    await populateStateDropdown(stateSelect, "Select a State / UT");
+    // 1. Restore saved soil inputs
     restoreFieldInputs(["N", "P", "K", "ph"]);
 
-    stateSelect.onchange = async function () {
-        districtInput.disabled = true;
-        districtInput.innerHTML = `<option value="">Loading districts…</option>`;
-        if (!stateSelect.value) {
-            districtInput.innerHTML = `<option value="">Select a State / UT first</option>`;
-            return;
-        }
-        try {
-            const districts = await fetchApi(`/districts?state=${encodeURIComponent(stateSelect.value)}`);
-            districtInput.innerHTML = `<option value="">Select a district</option>` + districts.map(district => `<option value="${district}">${district}</option>`).join("");
-            districtInput.disabled = false;
-        } catch (error) {
-            districtInput.innerHTML = `<option value="">Districts unavailable</option>`;
-            showToast(error.message, "error");
-        }
-    };
+    // 2. Setup State & District autocomplete
+    const locationPicker = setupLocationAutocomplete({
+        stateInput,
+        stateSuggestions,
+        districtInput,
+        districtSuggestions
+    });
 
-    // 2. Pre-fill typical Rice example values
+    // 3. Pre-fill typical Rice example values
     if (fillExampleBtn) {
-        fillExampleBtn.onclick = function () {
+        fillExampleBtn.onclick = async function () {
             ["N", "P", "K", "ph"].forEach(key => {
                 const def = FIELD_DEFINITIONS[key];
                 const input = getElement("#f-" + key);
                 if (input) input.value = def.defaultValue;
             });
-            showToast("Example values loaded (typical rice conditions)");
+            await locationPicker.setStateAndDistrict("Telangana", "Hyderabad");
+            showToast("Example values loaded (Rice in Hyderabad, Telangana)");
         };
     }
 
-    // 3. Form submit handler
+    // 4. Form submit handler
     formElement.onsubmit = function (event) {
         event.preventDefault();
+        locationPicker.hideAll();
         const submitButton = getElement("#go");
 
         executeWithLoadingState(submitButton, async function () {
-            if (!districtInput.value) {
-                throw new Error("Choose a district before continuing.");
+            const stateVal = stateInput?.value.trim();
+            const districtVal = districtInput?.value.trim();
+
+            if (!stateVal) {
+                throw new Error("Please enter or select a State / UT.");
             }
+            if (!districtVal) {
+                throw new Error("Please enter or select a District.");
+            }
+
             const conditionsPayload = readFormFeatures(["N", "P", "K", "ph"]);
             conditionsPayload.location = {
-                state: stateSelect.value,
-                district: districtInput.value
+                state: stateVal,
+                district: districtVal
             };
 
             // Send to FastAPI /predict
@@ -549,7 +789,6 @@ function displayRecommendationResult(result) {
                     <div><b>${result.weather.annual_rainfall.toFixed(1)} mm</b><span>Rainfall, previous ${result.weather.rainfall_period_days} days</span></div>
                     <div><b>${result.weather.rainfall.toFixed(1)} mm</b><span>Monthly rainfall used by model</span></div>
                 </div>
-                <p class="note">Retrieved at ${result.weather.observed_at} from ${result.weather.source}. The model uses the 365-day rainfall total divided by 12, matching its monthly rainfall scale.${result.weather.rainfall_capped ? ` The normalized value was outside the model range and was set to the supported maximum of ${result.weather.rainfall_maximum.toFixed(1)} mm.` : ""} Temperature and humidity are current conditions.</p>
             </div>
         `;
     }
@@ -582,6 +821,13 @@ function displayRecommendationResult(result) {
                 <div>
                     Model probability <b>${(topCrop.probability * 100).toFixed(1)}%</b> · Confidence <b>${result.confidence_label}</b>
                 </div>
+                ${result.schemes && result.schemes.length > 0 ? `
+                    <div style="margin-top:14px">
+                        <a class="btn sm" href="/government-schemes?crop=${encodeURIComponent(topCrop.crop)}&state=${encodeURIComponent(result.location?.state || '')}&district=${encodeURIComponent(result.location?.district || '')}" target="_blank" style="cursor:pointer;background:var(--fresh);color:#fff;text-decoration:none">
+                            <i class="fa-solid fa-building-columns"></i> View Government Schemes (${result.schemes.length}) <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.8em;margin-left:4px"></i>
+                        </a>
+                    </div>
+                ` : ""}
             </div>
         `;
 
@@ -621,20 +867,20 @@ function displayRecommendationResult(result) {
     htmlContent += `
         <div class="kv">
             <div>
-                <b>${result.normalized_entropy}</b>
+                <b>${result.normalized_entropy ?? "–"}</b>
                 <span>Normalised entropy (0 sure – 1 unsure)</span>
             </div>
             <div>
-                <b>${(result.margin * 100).toFixed(1)}%</b>
+                <b>${result.margin !== undefined && result.margin !== null ? (result.margin * 100).toFixed(1) + "%" : "–"}</b>
                 <span>Top-2 probability margin</span>
             </div>
             <div>
-                <b>${(result.stability_change_rate * 100).toFixed(0)}%</b>
-                <span>Changed in ${result.stability_runs} noisy re-runs</span>
+                <b>${result.stability_change_rate !== undefined && result.stability_change_rate !== null ? (result.stability_change_rate * 100).toFixed(0) + "%" : "–"}</b>
+                <span>Changed in ${result.stability_runs ?? 20} noisy re-runs</span>
             </div>
             <div>
-                <b>${result.out_of_range_check.distance}</b>
-                <span>Unusualness (limit ${result.out_of_range_check.threshold})</span>
+                <b>${result.out_of_range_check?.distance ?? "–"}</b>
+                <span>Unusualness (limit ${result.out_of_range_check?.threshold ?? "–"})</span>
             </div>
         </div>
         <div class="inl">
@@ -650,39 +896,43 @@ function displayRecommendationResult(result) {
     // Render Charts if recommendation was valid
     if (status !== "OUT_OF_RANGE") {
         // Chart 1: Top 3 Crop Probabilities
-        renderChart("c-top", {
-            type: "bar",
-            data: {
-                labels: result.top_k.map(item => capitalizeFirstLetter(item.crop)),
-                datasets: [{
-                    data: result.top_k.map(item => item.probability * 100),
-                    backgroundColor: CHART_COLORS
-                }]
-            },
-            options: {
-                indexAxis: "y",
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { max: 100, title: { display: true, text: "Probability (%)" } }
+        if (result.top_k && Array.isArray(result.top_k)) {
+            renderChart("c-top", {
+                type: "bar",
+                data: {
+                    labels: result.top_k.map(item => capitalizeFirstLetter(item.crop)),
+                    datasets: [{
+                        data: result.top_k.map(item => item.probability * 100),
+                        backgroundColor: CHART_COLORS
+                    }]
+                },
+                options: {
+                    indexAxis: "y",
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { max: 100, title: { display: true, text: "Probability (%)" } }
+                    }
                 }
-            }
-        });
+            });
+        }
 
         // Chart 2: Feature Attribution Explanation
-        renderChart("c-exp", {
-            type: "bar",
-            data: {
-                labels: result.explanation.map(item => `${item.feature} = ${item.value}`),
-                datasets: [{
-                    data: result.explanation.map(item => item.effect),
-                    backgroundColor: result.explanation.map(item => item.effect >= 0 ? "#4C956C" : "#B3392F")
-                }]
-            },
-            options: {
-                indexAxis: "y",
-                plugins: { legend: { display: false } }
-            }
-        });
+        if (result.explanation && Array.isArray(result.explanation)) {
+            renderChart("c-exp", {
+                type: "bar",
+                data: {
+                    labels: result.explanation.map(item => `${item.feature} = ${item.value}`),
+                    datasets: [{
+                        data: result.explanation.map(item => item.effect),
+                        backgroundColor: result.explanation.map(item => item.effect >= 0 ? "#4C956C" : "#B3392F")
+                    }]
+                },
+                options: {
+                    indexAxis: "y",
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
     }
 }
 
@@ -749,24 +999,81 @@ pageControllers.ideal_conditions = async function () {
 pageControllers.land_check = async function () {
     const cropSelect = getElement("#crop");
     const formElement = getElement("#form");
+    const stateInput = getElement("#state");
+    const stateSuggestions = getElement("#state-suggestions");
+    const districtInput = getElement("#district");
+    const districtSuggestions = getElement("#district-suggestions");
 
+    // Populate dropdown with available crops
     await populateCropDropdown(cropSelect, false);
-    restoreFieldInputs(Object.keys(FIELD_DEFINITIONS));
+
+    // Restore soil nutrient values from localStorage
+    restoreFieldInputs(["N", "P", "K", "ph"]);
+
+    // Setup State & District auto-suggestions
+    const locationPicker = setupLocationAutocomplete({
+        stateInput,
+        stateSuggestions,
+        districtInput,
+        districtSuggestions
+    });
 
     formElement.onsubmit = function (event) {
         event.preventDefault();
+        locationPicker.hideAll();
         const submitButton = getElement("#go");
 
         executeWithLoadingState(submitButton, async function () {
-            const conditions = readFormFeatures(Object.keys(FIELD_DEFINITIONS));
+            const stateVal = stateInput?.value.trim();
+            const districtVal = districtInput?.value.trim();
+
+            if (!stateVal) {
+                throw new Error("Please enter or select a State / UT.");
+            }
+            if (!districtVal) {
+                throw new Error("Please enter or select a District.");
+            }
+
+            // Read soil nutrient values (temperature, humidity, and rainfall come from the backend via weather)
+            const soilNutrients = readFormFeatures(["N", "P", "K", "ph"]);
             const payload = {
                 crop: cropSelect.value,
-                conditions: conditions
+                N: soilNutrients.N,
+                P: soilNutrients.P,
+                K: soilNutrients.K,
+                ph: soilNutrients.ph,
+                location: {
+                    state: stateVal,
+                    district: districtVal
+                }
             };
 
             const result = await fetchApi("/land-check", payload);
 
             getElement("#result").innerHTML = `
+                ${result.weather ? `
+                    <div class="weather-box" style="margin-bottom:16px">
+                        <div class="weather-head">
+                            <span class="city-name"><i class="fa-solid fa-location-dot"></i> Weather for ${escapeHtml(result.location?.district || '')}, ${escapeHtml(result.location?.state || '')}</span>
+                            <span class="badge b-ok"><i class="fa-solid fa-cloud-sun"></i> Live Weather</span>
+                        </div>
+                        <div class="weather-metrics">
+                            <div class="metric">
+                                <span class="metric-val">${result.weather.temperature}°C</span>
+                                <span class="metric-lbl"><i class="fa-solid fa-temperature-half"></i> Temperature</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-val">${result.weather.humidity}%</span>
+                                <span class="metric-lbl"><i class="fa-solid fa-droplet"></i> Humidity</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-val">${result.weather.rainfall} mm</span>
+                                <span class="metric-lbl"><i class="fa-solid fa-cloud-rain"></i> Rainfall</span>
+                            </div>
+                        </div>
+                    </div>
+                ` : ""}
+
                 <div class="panel" style="text-align:center">
                     <div class="gauge" style="--p:${result.score}">
                         <span>${result.score}%</span>
@@ -774,12 +1081,13 @@ pageControllers.land_check = async function () {
                     <p style="margin:12px 0 0">Suitability score for <b>${capitalizeFirstLetter(result.crop)}</b></p>
                     ${renderBadge(result.verdict)}
                 </div>
+
                 <div class="panel tw">
                     <table>
-                        <tr><th>Feature</th><th>Your Value</th><th>Ideal Range</th><th>Status</th></tr>
+                        <tr><th>Feature</th><th>Your Land / Climate Value</th><th>Ideal Range</th><th>Status</th></tr>
                         ${result.features.map(f => `
                             <tr>
-                                <td>${FIELD_DEFINITIONS[f.feature].label}</td>
+                                <td>${FIELD_DEFINITIONS[f.feature] ? FIELD_DEFINITIONS[f.feature].label : f.feature}</td>
                                 <td>${f.value}</td>
                                 <td>${f.ideal.join(" – ")}</td>
                                 <td>${renderBadge(f.status)}</td>
@@ -787,6 +1095,7 @@ pageControllers.land_check = async function () {
                         `).join("")}
                     </table>
                 </div>
+
                 <div class="panel">
                     <h3><i class="fa-solid fa-screwdriver-wrench"></i> What to Improve</h3>
                     ${result.improvements.length > 0 
@@ -794,6 +1103,7 @@ pageControllers.land_check = async function () {
                         : "<p>All soil and climate conditions are within the crop's ideal range.</p>"
                     }
                 </div>
+
                 <div class="panel">
                     <h3><i class="fa-solid fa-brain"></i> Machine Learning Opinion</h3>
                     ${result.ml.status === "OUT_OF_RANGE"
@@ -812,6 +1122,9 @@ pageControllers.land_check = async function () {
                     <div class="note">${result.note}</div>
                 </div>
             `;
+
+            // Scroll to results
+            getElement("#result").scrollIntoView({ behavior: "smooth", block: "start" });
         });
     };
 };
@@ -1484,6 +1797,397 @@ pageControllers.model_performance = async function () {
 
     // 6. Decision Tree Human-Readable Surrogate Rules
     getElement("#rules").textContent = decisionRules.rules;
+};
+
+// ----------------------------------------------------------------------------
+// 4.12 7-Day Weather Forecast (Open-Meteo)
+// ----------------------------------------------------------------------------
+pageControllers.weather = function () {
+    const formElement = getElement("#form");
+    const cityInput = getElement("#city");
+    const submitButton = getElement("#go");
+    const resultContainer = getElement("#result");
+    const suggestionsBox = getElement("#city-suggestions");
+
+    if (!formElement || !cityInput || !resultContainer) return;
+
+    function escapeHtml(text) {
+        return String(text ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function formatValue(value, fallback = "–") {
+        return value === null || value === undefined ? fallback : value;
+    }
+
+    // ---- Live city / district / state autocomplete ----
+    let suggestTimer = null;
+    let latestSuggestId = 0;
+    let currentSuggestions = [];
+    let activeSuggestionIndex = -1;
+
+    function hideSuggestions() {
+        if (!suggestionsBox) return;
+        suggestionsBox.hidden = true;
+        suggestionsBox.innerHTML = "";
+        currentSuggestions = [];
+        activeSuggestionIndex = -1;
+        if (cityInput) {
+            cityInput.setAttribute("aria-expanded", "false");
+        }
+    }
+
+    function selectSuggestion(item) {
+        cityInput.value = item.value;
+        hideSuggestions();
+        cityInput.focus();
+    }
+
+    function renderSuggestions(items) {
+        if (!suggestionsBox) return;
+        currentSuggestions = items;
+        activeSuggestionIndex = -1;
+
+        if (!items.length) {
+            hideSuggestions();
+            return;
+        }
+
+        suggestionsBox.innerHTML = items.map((item, idx) => `
+            <li class="ac-item" role="option" data-index="${idx}">
+                <i class="fa-solid fa-location-dot" style="color:var(--fresh);margin-right:6px"></i>${escapeHtml(item.label)}
+            </li>
+        `).join("");
+        suggestionsBox.hidden = false;
+        if (cityInput) {
+            cityInput.setAttribute("aria-expanded", "true");
+        }
+    }
+
+    function updateActiveSuggestion() {
+        if (!suggestionsBox) return;
+        getAllElements(".ac-item", suggestionsBox).forEach((el, idx) => {
+            el.classList.toggle("active", idx === activeSuggestionIndex);
+        });
+    }
+
+    if (suggestionsBox) {
+        cityInput.addEventListener("input", () => {
+            const query = cityInput.value.trim();
+            clearTimeout(suggestTimer);
+
+            if (query.length < 2) {
+                hideSuggestions();
+                return;
+            }
+
+            suggestTimer = setTimeout(async () => {
+                const requestId = ++latestSuggestId;
+                try {
+                    const data = await fetchApi(`/weather/suggest?q=${encodeURIComponent(query)}`);
+                    if (requestId !== latestSuggestId) return;
+                    renderSuggestions(data.suggestions || []);
+                } catch {
+                    if (requestId === latestSuggestId) hideSuggestions();
+                }
+            }, 250);
+        });
+
+        // Use mousedown so clicking a suggestion works before input blur
+        suggestionsBox.addEventListener("mousedown", event => {
+            const itemEl = event.target.closest(".ac-item");
+            if (!itemEl) return;
+            event.preventDefault();
+            const idx = parseInt(itemEl.dataset.index, 10);
+            if (!isNaN(idx) && currentSuggestions[idx]) {
+                selectSuggestion(currentSuggestions[idx]);
+            }
+        });
+
+        // Keyboard navigation (ArrowDown, ArrowUp, Enter, Escape)
+        cityInput.addEventListener("keydown", event => {
+            if (suggestionsBox.hidden || !currentSuggestions.length) return;
+
+            if (event.key === "ArrowDown") {
+                event.preventDefault();
+                activeSuggestionIndex = (activeSuggestionIndex + 1) % currentSuggestions.length;
+                updateActiveSuggestion();
+            } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                activeSuggestionIndex = (activeSuggestionIndex - 1 + currentSuggestions.length) % currentSuggestions.length;
+                updateActiveSuggestion();
+            } else if (event.key === "Enter" && activeSuggestionIndex >= 0) {
+                event.preventDefault();
+                selectSuggestion(currentSuggestions[activeSuggestionIndex]);
+            } else if (event.key === "Escape") {
+                hideSuggestions();
+            }
+        });
+
+        document.addEventListener("click", event => {
+            if (!event.target.closest(".city-ac")) {
+                hideSuggestions();
+            }
+        });
+    }
+
+    // ---- Fetch and render 7-day forecast ----
+    formElement.onsubmit = function (event) {
+        event.preventDefault();
+        hideSuggestions();
+
+        executeWithLoadingState(submitButton, async function () {
+            const city = cityInput.value.trim();
+            if (!city) {
+                throw new Error("Please enter a city, district, or state name.");
+            }
+
+            // Show a clear loading message while fetching live forecast data
+            resultContainer.innerHTML = `
+                <div class="panel">
+                    ${renderEmptyPlaceholder("fa-spinner fa-spin", `Loading 7-day weather forecast for ${escapeHtml(city)}...`)}
+                </div>
+            `;
+
+            const url = `/weather?city=${encodeURIComponent(city)}`;
+            const forecast = await fetchApi(url);
+
+            const locationParts = [forecast.location];
+            if (forecast.state && forecast.state.toLowerCase() !== String(forecast.location || "").toLowerCase()) {
+                locationParts.push(forecast.state);
+            }
+            if (forecast.country) {
+                locationParts.push(forecast.country);
+            }
+            const locationLabel = locationParts.filter(Boolean).join(", ");
+
+            const rowsHtml = (forecast.days || []).map(day => `
+                <tr>
+                    <td><b>${escapeHtml(day.date)}</b></td>
+                    <td>${formatValue(day.min_temp_c)}</td>
+                    <td>${formatValue(day.max_temp_c)}</td>
+                    <td>${formatValue(day.humidity_percent)}%</td>
+                    <td>${formatValue(day.rain_mm)}</td>
+                    <td>${formatValue(day.rain_probability)}%</td>
+                </tr>
+            `).join("");
+
+            resultContainer.innerHTML = `
+                <div class="panel">
+                    <div class="inl" style="justify-content:space-between;align-items:center">
+                        <h3 style="margin:0"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(locationLabel)}</h3>
+                        ${renderBadge("live", `Source: ${escapeHtml(forecast.source)}`)}
+                    </div>
+                </div>
+
+                <div class="panel tw">
+                    <h3><i class="fa-solid fa-calendar-week"></i> 7-Day Forecast</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Min Temperature (°C)</th>
+                                <th>Max Temperature (°C)</th>
+                                <th>Humidity (%)</th>
+                                <th>Rainfall (mm)</th>
+                                <th>Rain Probability (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                    <div class="note">${escapeHtml(forecast.note)}</div>
+                </div>
+            `;
+        });
+    };
+};
+
+// ----------------------------------------------------------------------------
+// 4.13 Government Agricultural Schemes Page
+// ----------------------------------------------------------------------------
+pageControllers.schemes = async function () {
+    const cropSelect = getElement("#scheme-crop");
+    const stateInput = getElement("#scheme-state");
+    const stateSuggestions = getElement("#scheme-state-suggestions");
+    const formElement = getElement("#schemes-form");
+    const submitBtn = getElement("#schemes-go");
+    const resultContainer = getElement("#schemes-result");
+
+    if (!formElement || !resultContainer) return;
+
+    // 1. Populate crops dropdown dynamically
+    await populateCropDropdown(cropSelect);
+
+    // 2. Read query parameters from URL (e.g. ?crop=rice&state=Telangana)
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialCrop = (urlParams.get("crop") || "rice").toLowerCase();
+    const initialState = urlParams.get("state") || "Telangana";
+
+    if (cropSelect) cropSelect.value = initialCrop;
+    if (stateInput) stateInput.value = initialState;
+
+    // 3. Load state list for auto-suggestion
+    let allStates = [];
+    try {
+        const resp = await fetchApi("/states");
+        allStates = resp.states || [];
+    } catch {
+        allStates = [];
+    }
+
+    function hideStateSuggestions() {
+        if (!stateSuggestions) return;
+        stateSuggestions.hidden = true;
+        stateSuggestions.innerHTML = "";
+        stateInput?.setAttribute("aria-expanded", "false");
+    }
+
+    function renderStateSuggestions(list) {
+        if (!stateSuggestions) return;
+        if (!list.length) {
+            hideStateSuggestions();
+            return;
+        }
+        stateSuggestions.innerHTML = list.map((st, idx) => `
+            <li class="ac-item" role="option" data-value="${escapeHtml(st)}" data-index="${idx}">
+                <i class="fa-solid fa-location-dot" style="color:var(--fresh);margin-right:6px"></i>${escapeHtml(st)}
+            </li>
+        `).join("");
+        stateSuggestions.hidden = false;
+        stateInput?.setAttribute("aria-expanded", "true");
+    }
+
+    if (stateInput && stateSuggestions) {
+        const showFilteredStates = async () => {
+            if (!allStates.length) {
+                try {
+                    const resp = await fetchApi("/states");
+                    allStates = resp.states || [];
+                } catch {
+                    allStates = [];
+                }
+            }
+            const query = (stateInput.value || "").trim().toLowerCase();
+            const filtered = query ? allStates.filter(s => s.toLowerCase().includes(query)) : allStates;
+            renderStateSuggestions(filtered.slice(0, 10));
+        };
+
+        stateInput.addEventListener("input", showFilteredStates);
+        stateInput.addEventListener("focus", showFilteredStates);
+        stateInput.addEventListener("click", showFilteredStates);
+
+        stateSuggestions.addEventListener("mousedown", event => {
+            const item = event.target.closest(".ac-item");
+            if (!item) return;
+            event.preventDefault();
+            const val = item.dataset.value;
+            if (val) {
+                stateInput.value = val;
+                hideStateSuggestions();
+            }
+        });
+
+        document.addEventListener("click", event => {
+            if (!event.target.closest(".city-ac")) {
+                hideStateSuggestions();
+            }
+        });
+    }
+
+    // 4. Function to fetch and render schemes
+    async function loadAndDisplaySchemes(cropName, stateName) {
+        resultContainer.innerHTML = `
+            <div class="panel">
+                ${renderEmptyPlaceholder("fa-spinner fa-spin", `Loading government schemes for ${escapeHtml(capitalizeFirstLetter(cropName))} in ${escapeHtml(stateName)}...`)}
+            </div>
+        `;
+
+        try {
+            const data = await fetchApi(`/schemes?crop=${encodeURIComponent(cropName)}&state=${encodeURIComponent(stateName)}`);
+            const schemes = data.schemes || [];
+
+            if (!schemes.length) {
+                resultContainer.innerHTML = `
+                    <div class="panel">
+                        ${renderEmptyPlaceholder("fa-circle-info", `No specific government schemes found for ${escapeHtml(capitalizeFirstLetter(cropName))} in ${escapeHtml(stateName)}.`)}
+                    </div>
+                `;
+                return;
+            }
+
+            const cardsHtml = schemes.map(s => `
+                <div class="card" style="border:1px solid var(--line);background:#fff;border-radius:12px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.03)">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                        <h3 style="margin:0;font-size:1.15rem;color:var(--forest)">
+                            <i class="fa-solid fa-award" style="color:var(--fresh);margin-right:8px"></i>${escapeHtml(s.name)}
+                        </h3>
+                        <span class="badge ${s.level === 'Central' ? 'b-ok' : 'b-ideal'}">
+                            ${escapeHtml(s.badge || s.level + ' Scheme')}
+                        </span>
+                    </div>
+
+                    <p style="margin:0 0 10px 0;font-size:0.95rem;line-height:1.55;color:var(--text)">
+                        <b>Financial Assistance / Benefits:</b> ${escapeHtml(s.benefits)}
+                    </p>
+
+                    <div style="font-size:0.9rem;color:var(--muted);margin-bottom:14px;line-height:1.45;background:#f9fbf9;border-radius:8px;padding:10px 14px">
+                        <div><b>Eligibility:</b> ${escapeHtml(s.eligibility)}</div>
+                        <div style="margin-top:6px"><b>How to Apply:</b> ${escapeHtml(s.how_to_apply)}</div>
+                    </div>
+
+                    <div style="display:flex;justify-content:flex-end">
+                        <a class="btn sm ghost" href="${escapeHtml(s.portal_link)}" target="_blank" rel="noopener noreferrer">
+                            Visit Official Portal <i class="fa-solid fa-arrow-up-right-from-square" style="margin-left:4px"></i>
+                        </a>
+                    </div>
+                </div>
+            `).join("");
+
+            resultContainer.innerHTML = `
+                <div class="panel">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                        <h2 style="margin:0;font-size:1.35rem">
+                            <i class="fa-solid fa-building-columns"></i> ${escapeHtml(capitalizeFirstLetter(cropName))} Schemes for ${escapeHtml(stateName)}
+                        </h2>
+                        <span class="badge b-ideal">${schemes.length} Schemes Available</span>
+                    </div>
+                    <p class="note" style="margin-top:6px;margin-bottom:0">
+                        Eligible subsidies, financial grants, crop insurance, and farmer support programs for cultivating <b>${escapeHtml(capitalizeFirstLetter(cropName))}</b> in <b>${escapeHtml(stateName)}</b>.
+                    </p>
+                </div>
+                <div class="schemes-list" style="margin-top:16px">
+                    ${cardsHtml}
+                </div>
+            `;
+        } catch (err) {
+            resultContainer.innerHTML = `
+                <div class="panel">
+                    <div class="alert bad">
+                        <b>Error loading schemes:</b> ${escapeHtml(err.message)}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // 5. Initial load based on URL or defaults
+    await loadAndDisplaySchemes(initialCrop, initialState);
+
+    // 6. Handle form submit for searching other crops / states
+    formElement.onsubmit = function (event) {
+        event.preventDefault();
+        hideStateSuggestions();
+        const selectedCrop = cropSelect?.value || "rice";
+        const selectedState = stateInput?.value.trim() || "Telangana";
+        executeWithLoadingState(submitBtn, async () => {
+            await loadAndDisplaySchemes(selectedCrop, selectedState);
+        });
+    };
 };
 
 

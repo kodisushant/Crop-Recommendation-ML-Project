@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Government Schemes{% endblock %}
+
+{% block body %}
+<!-- Page Header -->
+<div class="app-head">
+    <div class="wrap">
+        <h1>Government Agricultural Schemes</h1>
+        <p>Explore Central and State subsidies, crop insurance, financial grants, and farmer welfare programs tailored to your crop and state.</p>
+    </div>
+</div>
+
+<!-- Main Application Content -->
+<main class="app">
+    <div class="wrap">
+        <!-- Filter Form -->
+        <form id="schemes-form" class="panel inl" novalidate>
+            <div>
+                <label for="scheme-crop">Crop</label>
+                <select id="scheme-crop" required>
+                    <option value="">Select crop…</option>
+                </select>
+            </div>
+            
+            <div class="city-ac" style="min-width:260px;flex:1 1 260px">
+                <label for="scheme-state">State / UT</label>
+                <input type="text" id="scheme-state" name="state" autocomplete="off" placeholder="Type or click State (e.g. Telangana)" role="combobox" aria-autocomplete="list" aria-controls="scheme-state-suggestions" aria-expanded="false" required>
+                <ul id="scheme-state-suggestions" class="ac-list" role="listbox" aria-label="State suggestions" hidden></ul>
+            </div>
+            
+            <button class="btn" id="schemes-go" type="submit">
+                <span class="spinner"></span>
+                <i class="fa-solid fa-building-columns"></i> View Schemes
+            </button>
+        </form>
+
+        <!-- Schemes Results Container -->
+        <div id="schemes-result">
+            <div class="panel">
+                <div class="empty">
+                    <i class="fa-solid fa-spinner fa-spin"></i>Loading government schemes…
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}
