@@ -135,6 +135,7 @@ function escapeHtml(text) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
 }
+window.escapeHtml = escapeHtml;
 
 /** Formats a numeric value with a fallback string when null or undefined */
 function formatValue(value, fallback = "–") {
@@ -843,24 +844,47 @@ function displayRecommendationResult(result) {
             `;
         }
 
-        // Top 3 Crops Graph Container
-        htmlContent += `
-            <div class="panel">
-                <h3><i class="fa-solid fa-ranking-star"></i> Top 3 Recommended Crops</h3>
-                <div class="chart-box" style="height:200px">
-                    <canvas id="c-top"></canvas>
+        const isSoilMode = document.body.dataset.analysisMode === "soil";
+
+        if (isSoilMode) {
+            // In Soil Analysis mode, present the Soil & Feature Drivers first
+            htmlContent += `
+                <div class="panel" id="soil-analysis-panel">
+                    <h3><i class="fa-solid fa-magnifying-glass-chart"></i> Soil &amp; Feature Driver Analysis</h3>
+                    <div class="chart-box" style="height:260px">
+                        <canvas id="c-exp"></canvas>
+                    </div>
+                    <div class="note">
+                        Feature influence on ${capitalizeFirstLetter(topCrop.crop)}: Positive values (green) push towards this crop based on your soil nutrients and climate.
+                    </div>
                 </div>
-            </div>
-            <div class="panel">
-                <h3><i class="fa-solid fa-magnifying-glass-chart"></i> What Drove This Prediction</h3>
-                <div class="chart-box" style="height:260px">
-                    <canvas id="c-exp"></canvas>
+                <div class="panel">
+                    <h3><i class="fa-solid fa-ranking-star"></i> Top 3 Recommended Crops</h3>
+                    <div class="chart-box" style="height:200px">
+                        <canvas id="c-top"></canvas>
+                    </div>
                 </div>
-                <div class="note">
-                    Positive values push towards ${capitalizeFirstLetter(topCrop.crop)}. Feature effect estimated via model-agnostic random permutation occlusion.
+            `;
+        } else {
+            // In Crop Recommendation mode, show Top 3 Crops first
+            htmlContent += `
+                <div class="panel">
+                    <h3><i class="fa-solid fa-ranking-star"></i> Top 3 Recommended Crops</h3>
+                    <div class="chart-box" style="height:200px">
+                        <canvas id="c-top"></canvas>
+                    </div>
                 </div>
-            </div>
-        `;
+                <div class="panel" id="soil-analysis-panel">
+                    <h3><i class="fa-solid fa-magnifying-glass-chart"></i> What Drove This Prediction</h3>
+                    <div class="chart-box" style="height:260px">
+                        <canvas id="c-exp"></canvas>
+                    </div>
+                    <div class="note">
+                        Positive values push towards ${capitalizeFirstLetter(topCrop.crop)}. Feature effect estimated via model-agnostic random permutation occlusion.
+                    </div>
+                </div>
+            `;
+        }
     }
 
     // Reliability & Sensitivity Diagnostics
@@ -1810,18 +1834,6 @@ pageControllers.weather = function () {
     const suggestionsBox = getElement("#city-suggestions");
 
     if (!formElement || !cityInput || !resultContainer) return;
-
-    function escapeHtml(text) {
-        return String(text ?? "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;");
-    }
-
-    function formatValue(value, fallback = "–") {
-        return value === null || value === undefined ? fallback : value;
-    }
 
     // ---- Live city / district / state autocomplete ----
     let suggestTimer = null;

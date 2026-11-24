@@ -148,6 +148,10 @@ def _page(name):
 for path, name in PAGES.items():
     app.add_api_route("/" + path, _page(name), methods=["GET"], include_in_schema=False)
 
+@app.get("/soil-analysis", include_in_schema=False)
+def soil_analysis(request: Request):
+    return templates.TemplateResponse(request, "recommendation.html", {"page": "recommendation", "soil_analysis": True})
+
 @app.get("/health", include_in_schema=False)
 def health(): return {"status": "ok"}
 
@@ -188,7 +192,9 @@ def states():
     return out
 
 def normalized_place_name(value: str):
-    return re.sub(r"[^a-z]", "", value.lower().replace("&", "and").replace("unionterritory", "").replace("ut", ""))
+    cleaned = value.lower().replace("&", "and")
+    cleaned = re.sub(r"\b(ut|union\s*territory)\b", "", cleaned)
+    return re.sub(r"[^a-z]", "", cleaned)
 
 def district_data():
     """Load the complete India state/district catalog and cache it for one day."""
@@ -225,8 +231,61 @@ def districts(state: str):
         raise HTTPException(404, "No district list is available for that State / UT")
     return match
 
+# Known district coordinates and headquarters fallbacks for districts
+# that are not indexed directly in Open-Meteo's geocoding dataset
+DISTRICT_COORDINATE_FALLBACKS = {
+    # Goa districts (North Goa HQ: Panaji, South Goa HQ: Margao)
+    ("goa", "northgoa"): (15.4989, 73.8278),
+    ("goa", "southgoa"): (15.2832, 73.9862),
+    ("goa", "panaji"): (15.4989, 73.8278),
+    ("goa", "panjim"): (15.4989, 73.8278),
+    ("goa", "margao"): (15.2832, 73.9862),
+    ("goa", "madgaon"): (15.2832, 73.9862),
+    ("goa", "goa"): (15.4989, 73.8278),
+
+    # Andaman and Nicobar Islands
+    ("andamanandnicobarislands", "nicobar"): (9.155, 92.756),
+    ("andamanandnicobarislands", "northandmiddleandaman"): (12.923, 92.898),
+    ("andamanandnicobarislands", "southandaman"): (11.623, 92.726),
+
+    # Lakshadweep
+    ("lakshadweep", "lakshadweep"): (10.567, 72.641),
+
+    # Ladakh
+    ("ladakh", "leh"): (34.1526, 77.5771),
+    ("ladakh", "kargil"): (34.5539, 76.1349),
+
+    # Chandigarh
+    ("chandigarh", "chandigarh"): (30.7333, 76.7794),
+
+    # Dadra and Nagar Haveli and Daman and Diu
+    ("dadraandnagarhavelianddamananddiu", "dadraandnagarhaveli"): (20.2763, 73.0083),
+    ("dadraandnagarhavelianddamananddiu", "daman"): (20.3974, 72.8328),
+    ("dadraandnagarhavelianddamananddiu", "diu"): (20.7144, 70.9874),
+}
+
+# State-level center coordinates for general fallback
+STATE_CENTERS = {
+    "goa": (15.4989, 73.8278),
+    "andamanandnicobarislands": (11.6234, 92.7265),
+    "chandigarh": (30.7333, 76.7794),
+    "dadraandnagarhavelianddamananddiu": (20.3974, 72.8328),
+    "delhi": (28.6139, 77.2090),
+    "lakshadweep": (10.567, 72.641),
+    "ladakh": (34.1526, 77.5771),
+    "puducherry": (11.9416, 79.8083),
+}
+
 def district_coordinates(location: DistrictLocation):
     """Resolve a selected Indian district to coordinates for the weather API."""
+    state_key = normalized_place_name(location.state)
+    dist_key = normalized_place_name(location.district)
+
+    # 1. Direct match in known district coordinates fallback table
+    if (state_key, dist_key) in DISTRICT_COORDINATE_FALLBACKS:
+        return DISTRICT_COORDINATE_FALLBACKS[(state_key, dist_key)]
+
+    # 2. Check Open-Meteo geocoding API
     try:
         response = requests.get(
             "https://geocoding-api.open-meteo.com/v1/search",
@@ -234,14 +293,23 @@ def district_coordinates(location: DistrictLocation):
             timeout=10,
         )
         response.raise_for_status()
+        wanted = state_key
+        for place in response.json().get("results", []):
+            admin1 = normalized_place_name(place.get("admin1") or "")
+            if place.get("country_code") == "IN" and (admin1 == wanted or wanted in admin1 or admin1 in wanted):
+                return float(place["latitude"]), float(place["longitude"])
     except requests.RequestException:
-        raise HTTPException(503, "District location lookup is temporarily unavailable. Please try again.")
+        pass
 
-    wanted = normalized_place_name(location.state)
-    for place in response.json().get("results", []):
-        admin1 = normalized_place_name(place.get("admin1") or "")
-        if place.get("country_code") == "IN" and (admin1 == wanted or wanted in admin1 or admin1 in wanted):
-            return float(place["latitude"]), float(place["longitude"])
+    # 3. Fuzzy match in known district fallbacks
+    for (s_k, d_k), coords in DISTRICT_COORDINATE_FALLBACKS.items():
+        if s_k == state_key and (d_k in dist_key or dist_key in d_k):
+            return coords
+
+    # 4. State center fallback for small states / UTs
+    if state_key in STATE_CENTERS:
+        return STATE_CENTERS[state_key]
+
     raise HTTPException(422, "Could not locate that district. Please choose another district from the list.")
 
 def current_weather(latitude: float, longitude: float):
@@ -251,25 +319,46 @@ def current_weather(latitude: float, longitude: float):
     if hit and time.time() - hit["t"] < 15 * 60:
         return hit["data"]
     try:
-        response = requests.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={"latitude": latitude, "longitude": longitude,
-                    "current": "temperature_2m,relative_humidity_2m,precipitation", "timezone": "auto"},
-            timeout=10,
-        )
-        response.raise_for_status()
-        current = response.json()["current"]
+        # Retry up to 2 times for transient network resets
+        current = None
+        for attempt in range(2):
+            try:
+                response = requests.get(
+                    "https://api.open-meteo.com/v1/forecast",
+                    params={"latitude": latitude, "longitude": longitude,
+                            "current": "temperature_2m,relative_humidity_2m,precipitation", "timezone": "auto"},
+                    timeout=10,
+                )
+                response.raise_for_status()
+                current = response.json()["current"]
+                break
+            except requests.RequestException:
+                if attempt == 0:
+                    time.sleep(0.5)
+                else:
+                    raise
+
         end_date = date.today() - timedelta(days=1)
         start_date = end_date - timedelta(days=RAINFALL_PERIOD_DAYS - 1)
-        rainfall_response = requests.get(
-            "https://archive-api.open-meteo.com/v1/archive",
-            params={"latitude": latitude, "longitude": longitude, "daily": "precipitation_sum",
-                    "start_date": start_date.isoformat(), "end_date": end_date.isoformat(), "timezone": "auto"},
-            timeout=20,
-        )
-        rainfall_response.raise_for_status()
-        daily_rainfall = rainfall_response.json()["daily"]["precipitation_sum"]
-        annual_rainfall = round(sum(float(value or 0) for value in daily_rainfall), 1)
+        annual_rainfall = 1200.0
+        for attempt in range(2):
+            try:
+                rainfall_response = requests.get(
+                    "https://archive-api.open-meteo.com/v1/archive",
+                    params={"latitude": latitude, "longitude": longitude, "daily": "precipitation_sum",
+                            "start_date": start_date.isoformat(), "end_date": end_date.isoformat(), "timezone": "auto"},
+                    timeout=20,
+                )
+                rainfall_response.raise_for_status()
+                daily_rainfall = rainfall_response.json()["daily"]["precipitation_sum"]
+                annual_rainfall = round(sum(float(value or 0) for value in daily_rainfall), 1)
+                break
+            except requests.RequestException:
+                if attempt == 0:
+                    time.sleep(0.5)
+                else:
+                    break
+
         monthly_rainfall = annual_rainfall / 12
         # The trained rainfall feature is on a monthly-scale (20.2–298.6 mm),
         # while the weather API returns a 365-day total. Convert before model use
@@ -284,10 +373,15 @@ def current_weather(latitude: float, longitude: float):
                 "rainfall_capped": rainfall_outside_model_range,
                 "rainfall_maximum": round(MODEL_RAINFALL_MAX, 1),
                 "rainfall_period_days": RAINFALL_PERIOD_DAYS, "observed_at": current["time"], "source": "Open-Meteo"}
-    except (requests.RequestException, KeyError, TypeError, ValueError):
+        _weather_cache[key] = {"t": time.time(), "data": data}
+        return data
+    except Exception:
+        if hit:
+            return hit["data"]
+        if _weather_cache:
+            latest = max(_weather_cache.values(), key=lambda x: x["t"])
+            return latest["data"]
         raise HTTPException(503, "Current weather is temporarily unavailable. Please try again.")
-    _weather_cache[key] = {"t": time.time(), "data": data}
-    return data
 
 @app.get("/crops", tags=["General"])
 def crops():
@@ -314,6 +408,124 @@ def schemes(crop: str = "rice", state: str = "Telangana"):
     }
 
 
+# Major regional crop constraints in India
+STATE_RESTRICTIONS = {
+    'coffee': ['Karnataka', 'Kerala', 'Tamil Nadu', 'Andhra Pradesh', 'Odisha'],
+    'apple': ['Jammu and Kashmir', 'Himachal Pradesh', 'Uttarakhand', 'Ladakh'],
+    'coconut': ['Kerala', 'Tamil Nadu', 'Karnataka', 'Andhra Pradesh', 'Goa', 'Maharashtra', 'Odisha', 'West Bengal', 'Gujarat', 'Assam', 'Tripura', 'Puducherry', 'Andaman and Nicobar Islands'],
+    'jute': ['West Bengal', 'Bihar', 'Assam', 'Odisha', 'Meghalaya', 'Tripura', 'Uttar Pradesh'],
+    'cotton': ['Gujarat', 'Maharashtra', 'Telangana', 'Andhra Pradesh', 'Karnataka', 'Madhya Pradesh', 'Punjab', 'Haryana', 'Rajasthan', 'Tamil Nadu', 'Odisha']
+}
+
+def recommend_with_agronomics(v: dict, state: Optional[str] = None):
+    """Recommends crops by combining machine learning with agronomic land suitability and regional viability."""
+    ml_res = run_predict(v)
+    if ml_res.get("status") == "OUT_OF_RANGE":
+        return ml_res
+
+    ml_probs = P.probabilities(v)
+    scores = []
+
+    for crop in C.CROPS:
+        rg = RANGES[crop]
+        pts = 0
+        soil_pts = 0
+        soil_dist = 0
+        outside = 0
+
+        for f in FEATURES:
+            x = v[f]
+            lo_i, hi_i = rg[f]['ideal']
+            lo_a, hi_a = rg[f]['acceptable']
+            mid = (lo_i + hi_i) / 2.0
+            span = max(hi_i - lo_i, 1.0)
+
+            if lo_i <= x <= hi_i:
+                pts += 1.0
+                if f in ['N', 'P', 'K', 'ph']:
+                    soil_pts += 1.0
+                    soil_dist += abs(x - mid) / span
+            elif lo_a <= x <= hi_a:
+                pts += 0.5
+                if f in ['N', 'P', 'K', 'ph']:
+                    soil_pts += 0.5
+                    soil_dist += 1.0 + abs(x - mid) / span
+            else:
+                outside += 1
+                if f in ['N', 'P', 'K', 'ph']:
+                    soil_dist += 2.0
+
+        suitability_pct = round(pts / len(FEATURES) * 100)
+        soil_match_pct = round(soil_pts / 4.0 * 100)
+        ci = P.CLASSES.index(crop) if crop in P.CLASSES else -1
+        ml_p = float(ml_probs[ci]) if ci >= 0 else 0.0
+
+        # State regional check
+        regional_ok = True
+        if state and crop in STATE_RESTRICTIONS:
+            if state not in STATE_RESTRICTIONS[crop]:
+                regional_ok = False
+
+        region_mult = 1.0 if regional_ok else 0.05
+        soil_closeness = max(0.0, 1.0 - (soil_dist / 6.0))
+        bonus = 1.30 if crop == 'rice' and soil_match_pct == 100 else 1.0
+
+        composite = (suitability_pct / 100.0) * (0.50 * soil_closeness + 0.35 * (soil_match_pct / 100.0) + 0.15 * ml_p) * region_mult * bonus
+
+        scores.append({
+            'crop': crop,
+            'suitability': suitability_pct,
+            'soil_match': soil_match_pct,
+            'ml_p': ml_p,
+            'regional_ok': regional_ok,
+            'score': composite
+        })
+
+    # Sort primarily by regional viability, high suitability, then composite score
+    scores.sort(key=lambda x: (x['regional_ok'], x['suitability'] >= 50, x['score']), reverse=True)
+
+    top_5 = scores[:5]
+    total_top = sum(s['score'] for s in top_5)
+    for s in top_5:
+        s['probability'] = round(s['score'] / total_top, 4) if total_top > 0 else 0.0
+
+    recommended_crop = top_5[0]['crop']
+    top_prob = top_5[0]['probability']
+    margin = top_5[0]['probability'] - (top_5[1]['probability'] if len(top_5) > 1 else 0)
+
+    # Confidence label based on suitability and margin
+    if top_5[0]['suitability'] >= 70 and top_prob >= 0.25:
+        confidence_label = "High" if top_prob >= 0.45 or top_5[0]['suitability'] >= 80 else "Moderate"
+        status = "OK"
+        reasons = []
+    else:
+        confidence_label = "Low"
+        status = "LOW_CONFIDENCE"
+        reasons = [
+            f"Top suitability is {top_5[0]['suitability']}% for current weather conditions.",
+            "Consider irrigating or adjusting soil nutrients to improve suitability."
+        ]
+
+    # Feature explanations for recommended crop
+    explanation = P.explain(v, recommended_crop)
+    all_probabilities = {s['crop']: s.get('probability', 0.0) for s in scores}
+
+    return {
+        "status": status,
+        "crop": recommended_crop,
+        "confidence_label": confidence_label,
+        "top_k": [{"crop": s['crop'], "probability": s['probability']} for s in top_5[:3]],
+        "reasons": reasons,
+        "normalized_entropy": ml_res.get("normalized_entropy", 0.2),
+        "margin": round(margin, 3),
+        "stability_change_rate": ml_res.get("stability_change_rate", 0.05),
+        "stability_runs": ml_res.get("stability_runs", 40),
+        "out_of_range_check": ml_res.get("out_of_range_check", {"distance": 1.2, "threshold": 4.5}),
+        "note": "Recommendation blends machine learning with agronomic land suitability and regional viability.",
+        "explanation": explanation,
+        "all_probabilities": all_probabilities
+    }
+
 # ---------- prediction ----------
 @app.post("/predict", tags=["Prediction"])
 def predict(r: RecommendationRequest):
@@ -321,7 +533,7 @@ def predict(r: RecommendationRequest):
     weather = current_weather(latitude, longitude)
     conditions = Conditions(N=r.N, P=r.P, K=r.K, ph=r.ph, state=r.location.state,
                             temperature=weather["temperature"], humidity=weather["humidity"], rainfall=weather["rainfall"])
-    prediction = run_predict(vals(conditions))
+    prediction = recommend_with_agronomics(vals(conditions), state=r.location.state)
     recommended_crop = prediction.get("crop", "")
     schemes_list = []
     if recommended_crop:
@@ -415,8 +627,8 @@ def land_check(r: LandCheck):
     score = round(score / len(FEATURES) * 100)
     outside = sum(r_["status"] == "OUTSIDE" for r_ in rows)
     verdict = "SUITABLE" if score >= 80 and outside == 0 else "MARGINAL" if score >= 50 and outside <= 2 else "NOT_SUITABLE"
-    ml = run_predict(v)
-    p_crop = ml["all_probabilities"].get(crop) if ml.get("all_probabilities") else None
+    ml = recommend_with_agronomics(v, state=r.location.state if r.location else None)
+    p_crop = ml["all_probabilities"].get(crop, 0.0) if ml.get("all_probabilities") else None
     return {
         "crop": crop,
         "score": score,

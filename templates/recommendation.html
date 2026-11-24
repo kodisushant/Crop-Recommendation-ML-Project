@@ -1,13 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}Crop Recommendation{% endblock %}
+{% block title %}{% if soil_analysis %}Soil Analysis{% else %}Crop Recommendation{% endif %}{% endblock %}
 
 {% block body %}
 <!-- Page Header -->
 <div class="app-head">
     <div class="wrap">
-        <h1>Crop Recommendation</h1>
-        <p>Enter soil values and select your district. Current temperature, humidity, and precipitation are fetched automatically for the recommendation.</p>
+        <h1>{% if soil_analysis %}Soil Analysis{% else %}Crop Recommendation{% endif %}</h1>
+        <p>{% if soil_analysis %}Enter soil values and select your district. Current weather is fetched automatically to
+            analyze which soil nutrients and features drive the prediction.{% else %}Enter soil values and select your
+            district. Current temperature, humidity, and precipitation are fetched automatically for the
+            recommendation.{% endif %}</p>
     </div>
 </div>
 
@@ -76,25 +79,35 @@
                     <!-- State Input with Auto Suggestion -->
                     <div class="city-ac" style="width:100%;max-width:none;margin-bottom:14px">
                         <label for="state">State / UT</label>
-                        <input type="text" id="state" name="state" autocomplete="off" placeholder="Type or click to search State (e.g. Telangana, Maharashtra)" role="combobox" aria-autocomplete="list" aria-controls="state-suggestions" aria-expanded="false" required>
-                        <ul id="state-suggestions" class="ac-list" role="listbox" aria-label="State suggestions" hidden></ul>
+                        <input type="text" id="state" name="state" autocomplete="off"
+                            placeholder="Type or click to search State (e.g. Telangana, Maharashtra)" role="combobox"
+                            aria-autocomplete="list" aria-controls="state-suggestions" aria-expanded="false" required>
+                        <ul id="state-suggestions" class="ac-list" role="listbox" aria-label="State suggestions" hidden>
+                        </ul>
                     </div>
 
                     <!-- District Input with Auto Suggestion -->
                     <div class="city-ac" style="width:100%;max-width:none">
                         <label for="district">District</label>
-                        <input type="text" id="district" name="district" autocomplete="off" placeholder="Type or click to search District (e.g. Hyderabad, Warangal)" role="combobox" aria-autocomplete="list" aria-controls="district-suggestions" aria-expanded="false" required>
-                        <ul id="district-suggestions" class="ac-list" role="listbox" aria-label="District suggestions" hidden></ul>
+                        <input type="text" id="district" name="district" autocomplete="off"
+                            placeholder="Type or click to search District (e.g. Hyderabad, Warangal)" role="combobox"
+                            aria-autocomplete="list" aria-controls="district-suggestions" aria-expanded="false"
+                            required>
+                        <ul id="district-suggestions" class="ac-list" role="listbox" aria-label="District suggestions"
+                            hidden></ul>
                     </div>
 
-                    <div class="hint">Type or click to see auto suggestions for State and District. Temperature, humidity, and rainfall are retrieved automatically when you recommend.</div>
+                    <div class="hint">Type or click to see auto suggestions for State and District. Temperature,
+                        humidity, and rainfall are retrieved automatically when you recommend.</div>
                 </div>
 
                 <!-- Action Buttons -->
                 <div class="inl">
                     <button class="btn" id="go" type="submit">
                         <span class="spinner"></span>
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Recommend crop
+                        <i
+                            class="fa-solid {% if soil_analysis %}fa-magnifying-glass-chart{% else %}fa-wand-magic-sparkles{% endif %}"></i>
+                        {% if soil_analysis %}Analyze Soil &amp; Features{% else %}Recommend crop{% endif %}
                     </button>
                     <button type="button" class="btn ghost" id="fill-example">
                         <i class="fa-solid fa-flask-vial"></i> Use example

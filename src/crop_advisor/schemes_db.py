@@ -484,6 +484,51 @@ SEED_SCHEMES = [
         "how_to_apply": "Apply through the AIMS Kerala portal (aims.kerala.gov.in) or visit your local Krishi Bhavan.",
         "portal_link": "https://aims.kerala.gov.in",
     },
+    # ==================== GOA STATE SCHEMES ====================
+    {
+        "name": "Goa Shetkari Adhar Yojana",
+        "level": "State",
+        "state": "Goa",
+        "crop_category": "ALL",
+        "applicable_crops": "ALL",
+        "benefits": "Compensation and financial relief up to ₹40,000/ha to farmers suffering crop loss due to unseasonal rain, floods, pests, or wildlife incursions.",
+        "eligibility": "All bonafide farmers in North Goa and South Goa registered with a Krishi Card.",
+        "how_to_apply": "Submit claim form at the nearest Zonal Agriculture Office (ZAO) within 15 days of damage.",
+        "portal_link": "https://agri.goa.gov.in",
+    },
+    {
+        "name": "Goa Assistance for Cultivation of Paddy and Cereals",
+        "level": "State",
+        "state": "Goa",
+        "crop_category": "Cereals & Millets",
+        "applicable_crops": "rice,maize",
+        "benefits": "Input subsidy up to ₹40,000 per hectare for mechanical transplanting, certified seeds subsidy, and assured procurement support at remunerative prices.",
+        "eligibility": "Paddy and cereal growers in Goa holding agricultural land title or tenant tenancy card.",
+        "how_to_apply": "Apply through the Zonal Agricultural Office (ZAO) or online on Goa Online Portal (goaonline.gov.in).",
+        "portal_link": "https://agri.goa.gov.in",
+    },
+    {
+        "name": "Goa Coconut & Plantation Rejuvenation Scheme",
+        "level": "State",
+        "state": "Goa",
+        "crop_category": "Plantation Crops",
+        "applicable_crops": "coconut",
+        "benefits": "Subsidy of ₹150 per high-yielding coconut seedling, 75% financial grant for cutting diseased palms, and 50% subsidy for micro-irrigation systems.",
+        "eligibility": "Coconut plantation farmers and grove owners in Goa with active Krishi Card.",
+        "how_to_apply": "Apply online at goaonline.gov.in or in person at the local ZAO.",
+        "portal_link": "https://agri.goa.gov.in",
+    },
+    {
+        "name": "Goa Commercial Horticulture & Fruit Crops Support",
+        "level": "State",
+        "state": "Goa",
+        "crop_category": "Fruits & Horticulture",
+        "applicable_crops": "banana,mango,papaya,watermelon,muskmelon",
+        "benefits": "50% capital subsidy on quality grafted planting material, solar fencing subsidies, and micro-irrigation drip subsidies.",
+        "eligibility": "Growers of fruit and commercial horticulture crops in Goa.",
+        "how_to_apply": "Register with the Directorate of Agriculture, Krishi Bhavan, Tonca, Caranzalem, Goa.",
+        "portal_link": "https://agri.goa.gov.in",
+    },
 ]
 
 
@@ -495,7 +540,7 @@ def init_db() -> None:
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS schemes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
+            name TEXT NOT NULL UNIQUE,
             level TEXT NOT NULL,
             state TEXT NOT NULL,
             crop_category TEXT NOT NULL,
@@ -507,11 +552,10 @@ def init_db() -> None:
         )
     """)
 
-    # Seed initial schemes if table is empty
-    cursor.execute("SELECT COUNT(*) FROM schemes")
-    count = cursor.fetchone()[0]
-    if count == 0:
-        for s in SEED_SCHEMES:
+    # Insert or update all seed schemes
+    for s in SEED_SCHEMES:
+        cursor.execute("SELECT id FROM schemes WHERE name = ?", (s["name"],))
+        if cursor.fetchone() is None:
             cursor.execute("""
                 INSERT INTO schemes (name, level, state, crop_category, applicable_crops, benefits, eligibility, how_to_apply, portal_link)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -520,7 +564,7 @@ def init_db() -> None:
                 s["applicable_crops"], s["benefits"], s["eligibility"],
                 s["how_to_apply"], s["portal_link"]
             ))
-        conn.commit()
+    conn.commit()
     conn.close()
 
 
