@@ -30,22 +30,12 @@ API_KEY = os.getenv("DATA_GOV_API_KEY", "")
 RESOURCE = os.getenv("DATA_GOV_RESOURCE_ID", "9ef84268-d588-465a-a308-a864a43d0070")
 REQ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
-# Scaling factor for agricultural season (India's crop season spans 4 months = 1/3 of year).
-# Scaled ranges match ICAR seasonal water requirements for crops.
-SEASON_FACTOR = 4.0
-
 # ---------- dataset-derived ranges ----------
 RANGES = {}
 for crop, g in DF.groupby("label"):
-    RANGES[crop] = {}
-    for f in FEATURES:
-        factor = SEASON_FACTOR if f == "rainfall" else 1.0
-        RANGES[crop][f] = {
-            "ideal": [round(float(g[f].quantile(.10)) * factor, 1 if f == "rainfall" else 2),
-                      round(float(g[f].quantile(.90)) * factor, 1 if f == "rainfall" else 2)],
-            "acceptable": [round(float(g[f].quantile(.025)) * factor, 1 if f == "rainfall" else 2),
-                          round(float(g[f].quantile(.975)) * factor, 1 if f == "rainfall" else 2)]
-        }
+    RANGES[crop] = {f: {"ideal": [round(float(g[f].quantile(.10)), 2), round(float(g[f].quantile(.90)), 2)],
+                        "acceptable": [round(float(g[f].quantile(.025)), 2), round(float(g[f].quantile(.975)), 2)]}
+                    for f in FEATURES}
 
 
 # ---------- schemas ----------
@@ -56,7 +46,7 @@ class Conditions(BaseModel):
     temperature: float = Field(..., ge=-5, le=55, description="°C")
     humidity: float = Field(..., ge=0, le=100, description="%")
     ph: float = Field(..., ge=0, le=14)
-    rainfall: float = Field(..., ge=0, le=4000, description="Seasonal rainfall in mm (4-month crop season)")
+    rainfall: float = Field(..., ge=0, le=1000, description="Rainfall in mm")
     state: Optional[str] = Field(None, description="Location only - NOT an ML input")
 
 class DistrictLocation(BaseModel):
@@ -366,10 +356,9 @@ def current_weather(latitude: float, longitude: float):
                     break
 
         # Agricultural seasons in India (Kharif, Rabi, Zaid) span 4 months (~120 days).
-        # Seasonal rainfall is 1/3 of annual rainfall (or 4x monthly rainfall).
+        # Seasonal rainfall is 1/3 of annual rainfall.
         seasonal_rainfall = round(annual_rainfall / 3.0, 1)
-        monthly_normalized = seasonal_rainfall / SEASON_FACTOR
-        rainfall_outside_model_range = not (MODEL_RAINFALL_MIN <= monthly_normalized <= MODEL_RAINFALL_MAX)
+        rainfall_outside_model_range = not (MODEL_RAINFALL_MIN <= seasonal_rainfall <= MODEL_RAINFALL_MAX)
         data = {"temperature": float(current["temperature_2m"]),
                 "humidity": float(current["relative_humidity_2m"]),
                 "rainfall": seasonal_rainfall,
@@ -377,7 +366,7 @@ def current_weather(latitude: float, longitude: float):
                 "annual_rainfall": annual_rainfall,
                 "monthly_rainfall": round(annual_rainfall / 12.0, 1),
                 "rainfall_capped": rainfall_outside_model_range,
-                "rainfall_maximum": round(MODEL_RAINFALL_MAX * SEASON_FACTOR, 1),
+                "rainfall_maximum": round(MODEL_RAINFALL_MAX, 1),
                 "rainfall_period_days": 120, "observed_at": current["time"], "source": "Open-Meteo"}
         _weather_cache[key] = {"t": time.time(), "data": data}
         return data
@@ -397,7 +386,7 @@ def crops():
 @app.get("/crops/{crop}", tags=["General"])
 def crop_detail(crop: str):
     crop = need_crop(crop)
-    return {"crop": crop, **C.CROPS[crop], "ranges": RANGES[crop], "ranges_source": "10th–90th (ideal) and 2.5th–97.5th (acceptable) percentiles scaled to 4-month crop season water requirements",
+    return {"crop": crop, **C.CROPS[crop], "ranges": RANGES[crop], "ranges_source": "10th–90th (ideal) and 2.5th–97.5th (acceptable) percentiles from dataset",
             "reference_note": "Seasons, duration, price, yield, cost and soil are indicative reference values; confirm with ICAR / state agricultural university."}
 
 @app.get("/schemes", tags=["General"])
@@ -458,7 +447,7 @@ def evaluate_crop_suitability(crop: str, v: dict, state: Optional[str] = None):
                 soil_dist += 1.0 + abs(x - mid) / span
         elif f == 'humidity' and (lo_i * 0.85 <= x <= hi_i * 1.15):
             st, p = "BORDERLINE", 0.5
-        elif f == 'rainfall' and x >= (40.0 * SEASON_FACTOR):  # Irrigation supplements natural seasonal rainfall (>=160mm)
+        elif f == 'rainfall' and x >= 40.0:  # Irrigation supplements natural rainfall
             st, p = "BORDERLINE", 0.5
         elif f == 'temperature' and (lo_i - 5.0 <= x <= hi_i + 5.0):
             st, p = "BORDERLINE", 0.5
@@ -500,7 +489,7 @@ def evaluate_crop_suitability(crop: str, v: dict, state: Optional[str] = None):
 def recommend_with_agronomics(v: dict, state: Optional[str] = None):
     """Recommends crops by combining machine learning with agronomic land suitability and regional viability."""
     v_ml = dict(v)
-    v_ml["rainfall"] = min(MODEL_RAINFALL_MAX, max(MODEL_RAINFALL_MIN, v["rainfall"] / SEASON_FACTOR))
+    v_ml["rainfall"] = min(MODEL_RAINFALL_MAX, max(MODEL_RAINFALL_MIN, v["rainfall"]))
     ml_res = run_predict(v_ml)
     if ml_res.get("status") == "OUT_OF_RANGE":
         return ml_res

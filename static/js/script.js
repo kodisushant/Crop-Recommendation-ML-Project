@@ -82,13 +82,13 @@ const FIELD_DEFINITIONS = {
         step: 0.1
     },
     rainfall: {
-        label: "Seasonal Rainfall",
+        label: "Rainfall",
         unit: "mm",
         min: 0,
-        max: 4000,
+        max: 1000,
         defaultValue: 203,
         icon: "fa-cloud-rain",
-        description: "Seasonal rainfall (crop season)",
+        description: "Rainfall",
         group: "Weather Conditions",
         step: 0.1
     }
@@ -788,7 +788,7 @@ function displayRecommendationResult(result) {
                     <div><b>${result.weather.temperature.toFixed(1)}°C</b><span>Current temperature</span></div>
                     <div><b>${result.weather.humidity.toFixed(0)}%</b><span>Current humidity</span></div>
                     <div><b>${result.weather.annual_rainfall ? result.weather.annual_rainfall.toFixed(1) : result.weather.rainfall.toFixed(1)} mm</b><span>Annual rainfall (365 days)</span></div>
-                    <div><b>${(result.weather.seasonal_rainfall || result.weather.rainfall).toFixed(1)} mm</b><span>Seasonal rainfall (crop season)</span></div>
+                    <div><b>${(result.weather.seasonal_rainfall || result.weather.rainfall).toFixed(1)} mm</b><span>Seasonal rainfall</span></div>
                 </div>
             </div>
         `;
@@ -1071,7 +1071,7 @@ pageControllers.land_check = async function () {
                             </div>
                             <div class="metric">
                                 <span class="metric-val">${result.weather.rainfall} mm</span>
-                                <span class="metric-lbl"><i class="fa-solid fa-cloud-rain"></i> Seasonal Rainfall</span>
+                                <span class="metric-lbl"><i class="fa-solid fa-cloud-rain"></i> Rainfall</span>
                             </div>
                         </div>
                     </div>
