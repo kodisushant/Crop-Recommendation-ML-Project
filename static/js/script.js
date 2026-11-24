@@ -623,6 +623,28 @@ function setupLocationAutocomplete({ stateInput, stateSuggestions, districtInput
             hideDistrictSuggestions();
         },
         loadDistricts,
+        validateSelection: async () => {
+            if (!allStates.length) {
+                const resp = await fetchApi("/states");
+                allStates = resp.states || [];
+            }
+            const typedState = (stateInput?.value || "").trim();
+            const selectedState = allStates.find(s => s.toLowerCase() === typedState.toLowerCase());
+            if (!selectedState) {
+                throw new Error("Choose a State / UT from the suggestions.");
+            }
+            if (!currentDistricts.length || stateInput?.value !== selectedState) {
+                await loadDistricts(selectedState);
+            }
+            const typedDistrict = (districtInput?.value || "").trim();
+            const selectedDistrict = currentDistricts.find(d => d.toLowerCase() === typedDistrict.toLowerCase());
+            if (!selectedDistrict) {
+                throw new Error("Choose a complete District from the suggestions.");
+            }
+            if (stateInput) stateInput.value = selectedState;
+            if (districtInput) districtInput.value = selectedDistrict;
+            return { state: selectedState, district: selectedDistrict };
+        },
         setStateAndDistrict: async (st, dst) => {
             if (stateInput) stateInput.value = st;
             await loadDistricts(st);
@@ -745,20 +767,12 @@ pageControllers.recommendation = async function () {
         const submitButton = getElement("#go");
 
         executeWithLoadingState(submitButton, async function () {
-            const stateVal = stateInput?.value.trim();
-            const districtVal = districtInput?.value.trim();
-
-            if (!stateVal) {
-                throw new Error("Please enter or select a State / UT.");
-            }
-            if (!districtVal) {
-                throw new Error("Please enter or select a District.");
-            }
+            const location = await locationPicker.validateSelection();
 
             const conditionsPayload = readFormFeatures(["N", "P", "K", "ph"]);
             conditionsPayload.location = {
-                state: stateVal,
-                district: districtVal
+                state: location.state,
+                district: location.district
             };
 
             // Send to FastAPI /predict
@@ -844,6 +858,45 @@ function displayRecommendationResult(result) {
                     <div>Consider the top 3 options below as a shortlist.</div>
                 </div>
             `;
+        }
+
+        if (result.groundwater?.available) {
+            const groundwater = result.groundwater;
+            htmlContent += `
+                <div class="panel">
+                    <h3><i class="fa-solid fa-water"></i> Groundwater Monitoring</h3>
+                    <div class="kv">
+                        <div><b>${groundwater.median_dtwl_mbgl.toFixed(2)} mbgl</b><span>Median depth to water level</span></div>
+                        <div><b>${groundwater.monitoring_wells}</b><span>Monitored wells</span></div>
+                        <div><b>${groundwater.minimum_dtwl_mbgl.toFixed(2)}–${groundwater.maximum_dtwl_mbgl.toFixed(2)} mbgl</b><span>Observed range</span></div>
+                        <div><b>${escapeHtml(groundwater.condition)}</b><span>Depth category</span></div>
+                    </div>
+                    <p class="note">${escapeHtml(groundwater.observation_month)} data. ${escapeHtml(groundwater.note)}</p>
+                </div>
+            `;
+        } else if (result.groundwater) {
+            htmlContent += `<div class="alert"><b><i class="fa-solid fa-water"></i> Groundwater monitoring unavailable.</b> ${escapeHtml(result.groundwater.message || "No monitoring data found.")}</div>`;
+        }
+
+        if (result.water_outlook?.available) {
+            const outlook = result.water_outlook;
+            const signalClass = outlook.signal === "FAVOURABLE" ? "ok" :
+                (outlook.signal === "CAUTION" ? "low" : "out");
+            htmlContent += `
+                <div class="panel">
+                    <h3><i class="fa-solid fa-cloud-rain"></i> Water Availability &amp; Rainfall Outlook</h3>
+                    <p>${renderBadge(signalClass, outlook.signal.replace(/_/g, " "))} ${escapeHtml(outlook.reason)}</p>
+                    <div class="kv">
+                        <div><b>${outlook.rainfall.rainfall_mm.toFixed(1)} mm</b><span>Forecast rainfall (${outlook.rainfall.days} days)</span></div>
+                        <div><b>${outlook.rainfall.max_rain_probability === null ? "–" : outlook.rainfall.max_rain_probability.toFixed(0) + "%"}</b><span>Highest rain probability</span></div>
+                        <div><b>${outlook.groundwater.median_dtwl_mbgl.toFixed(2)} mbgl</b><span>January monitored median depth</span></div>
+                        <div><b>${outlook.groundwater.monitoring_wells}</b><span>Monitoring wells used</span></div>
+                    </div>
+                    <p class="note">${escapeHtml(outlook.note)} Rainfall source: ${escapeHtml(outlook.rainfall.source)}.</p>
+                </div>
+            `;
+        } else if (result.water_outlook) {
+            htmlContent += `<div class="alert"><b><i class="fa-solid fa-cloud-rain"></i> Water outlook unavailable.</b> ${escapeHtml(result.water_outlook.message || "Try again shortly.")}</div>`;
         }
 
         // Top 3 Crops Graph Container
@@ -1027,15 +1080,7 @@ pageControllers.land_check = async function () {
         const submitButton = getElement("#go");
 
         executeWithLoadingState(submitButton, async function () {
-            const stateVal = stateInput?.value.trim();
-            const districtVal = districtInput?.value.trim();
-
-            if (!stateVal) {
-                throw new Error("Please enter or select a State / UT.");
-            }
-            if (!districtVal) {
-                throw new Error("Please enter or select a District.");
-            }
+            const location = await locationPicker.validateSelection();
 
             // Read soil nutrient values (temperature, humidity, and rainfall come from the backend via weather)
             const soilNutrients = readFormFeatures(["N", "P", "K", "ph"]);
@@ -1046,8 +1091,8 @@ pageControllers.land_check = async function () {
                 K: soilNutrients.K,
                 ph: soilNutrients.ph,
                 location: {
-                    state: stateVal,
-                    district: districtVal
+                    state: location.state,
+                    district: location.district
                 }
             };
 

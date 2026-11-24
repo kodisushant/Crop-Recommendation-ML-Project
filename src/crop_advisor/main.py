@@ -164,6 +164,7 @@ def meta():
 
 _states = {"t": 0, "data": None}
 _weather_cache = {}
+_groundwater_data = None
 RAINFALL_PERIOD_DAYS = 365
 MODEL_RAINFALL_MIN = float(P.ood["min"]["rainfall"])
 MODEL_RAINFALL_MAX = float(P.ood["max"]["rainfall"])
@@ -277,6 +278,12 @@ def district_coordinates(location: DistrictLocation):
     state_key = normalized_place_name(location.state)
     dist_key = normalized_place_name(location.district)
 
+    catalog = district_data()
+    districts_for_state = next((items for key, items in catalog.items()
+                                if key == state_key or state_key in key or key in state_key), None)
+    if not districts_for_state or not any(normalized_place_name(name) == dist_key for name in districts_for_state):
+        raise HTTPException(422, "Choose a district from the suggestions for the selected State / UT.")
+
     # 1. Direct match in known district coordinates fallback table
     if (state_key, dist_key) in DISTRICT_COORDINATE_FALLBACKS:
         return DISTRICT_COORDINATE_FALLBACKS[(state_key, dist_key)]
@@ -377,6 +384,86 @@ def current_weather(latitude: float, longitude: float):
             latest = max(_weather_cache.values(), key=lambda x: x["t"])
             return latest["data"]
         raise HTTPException(503, "Current weather is temporarily unavailable. Please try again.")
+
+
+def groundwater_observation(state: str, district: str):
+    """Summarize January 2026 monitoring wells for a selected district."""
+    global _groundwater_data
+    if _groundwater_data is None:
+        path = BASE / "data" / "groundwater_january_2026.csv"
+        try:
+            data = pd.read_csv(path)
+            data["state_key"] = data["state"].map(normalized_place_name)
+            data["district_key"] = data["district"].map(normalized_place_name)
+            _groundwater_data = data
+        except (OSError, ValueError, KeyError) as e:
+            log.warning("Groundwater dataset unavailable: %s", e)
+            return {"available": False, "message": "January 2026 groundwater data is unavailable."}
+
+    state_key = normalized_place_name(state)
+    district_key = normalized_place_name(district)
+    rows = _groundwater_data[_groundwater_data["state_key"] == state_key]
+    exact = rows[rows["district_key"] == district_key]
+    if exact.empty:
+        exact = rows[rows["district_key"].map(lambda value: value in district_key or district_key in value)]
+    if exact.empty:
+        return {"available": False, "message": "No January 2026 monitoring-well reading is available for this district."}
+
+    levels = exact["dtwl_mbgl"]
+    median = round(float(levels.median()), 2)
+    condition = "Shallow" if median <= 5 else "Moderate" if median <= 10 else "Deep"
+    return {
+        "available": True,
+        "observation_month": "January 2026",
+        "monitoring_wells": int(exact[["latitude", "longitude", "observation_date"]].drop_duplicates().shape[0]),
+        "median_dtwl_mbgl": median,
+        "minimum_dtwl_mbgl": round(float(levels.min()), 2),
+        "maximum_dtwl_mbgl": round(float(levels.max()), 2),
+        "condition": condition,
+        "note": "Depth to water level is measured below ground level (mbgl). A deeper level does not by itself measure groundwater quantity or irrigation supply.",
+    }
+
+
+def rainfall_forecast(latitude: float, longitude: float):
+    """Return the next seven days' rainfall for the selected district."""
+    try:
+        response = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={"latitude": latitude, "longitude": longitude,
+                    "daily": "precipitation_sum,precipitation_probability_max",
+                    "timezone": "auto", "forecast_days": 7},
+            timeout=10,
+        )
+        response.raise_for_status()
+        daily = response.json().get("daily") or {}
+        rainfall = [float(value or 0) for value in daily.get("precipitation_sum") or []]
+        probabilities = [float(value or 0) for value in daily.get("precipitation_probability_max") or []]
+        if not rainfall:
+            raise ValueError("no rainfall forecast")
+        return {"available": True, "days": len(rainfall), "rainfall_mm": round(sum(rainfall), 1),
+                "max_rain_probability": round(max(probabilities), 0) if probabilities else None,
+                "start_date": (daily.get("time") or [None])[0], "source": "Open-Meteo"}
+    except (ValueError, requests.RequestException) as e:
+        log.warning("Rainfall forecast unavailable: %s", e)
+        return {"available": False, "message": "Seven-day rainfall forecast is temporarily unavailable."}
+
+
+def water_availability_outlook(groundwater: dict, rainfall: dict):
+    """Combine the local monitoring signal with near-term forecast rainfall."""
+    if not groundwater.get("available"):
+        return {"available": False, "message": groundwater.get("message", "Groundwater monitoring is unavailable.")}
+    if not rainfall.get("available"):
+        return {"available": False, "message": rainfall.get("message", "Rainfall forecast is unavailable.")}
+
+    depth, rain = groundwater["median_dtwl_mbgl"], rainfall["rainfall_mm"]
+    if depth <= 5:
+        signal, reason = "FAVOURABLE", "Monitored water level is relatively shallow for this district."
+    elif depth <= 10 or rain >= 20:
+        signal, reason = "CAUTION", "Plan irrigation carefully and monitor field conditions."
+    else:
+        signal, reason = "HIGH_WATER_RISK", "Monitored water level is deep and little rainfall is forecast."
+    return {"available": True, "signal": signal, "reason": reason, "groundwater": groundwater, "rainfall": rainfall,
+            "note": "Planning signal only. Confirm farm-level well yield, irrigation access, and soil moisture before planting."}
 
 @app.get("/crops", tags=["General"])
 def crops():
@@ -578,6 +665,8 @@ def recommend_with_agronomics(v: dict, state: Optional[str] = None):
 def predict(r: RecommendationRequest):
     latitude, longitude = district_coordinates(r.location)
     weather = current_weather(latitude, longitude)
+    groundwater = groundwater_observation(r.location.state, r.location.district)
+    rainfall = rainfall_forecast(latitude, longitude)
     conditions = Conditions(N=r.N, P=r.P, K=r.K, ph=r.ph, state=r.location.state,
                             temperature=weather["temperature"], humidity=weather["humidity"], rainfall=weather["rainfall"])
     prediction = recommend_with_agronomics(vals(conditions), state=r.location.state)
@@ -590,6 +679,8 @@ def predict(r: RecommendationRequest):
         **prediction,
         "location": {"state": r.location.state, "district": r.location.district},
         "weather": weather,
+        "groundwater": groundwater,
+        "water_outlook": water_availability_outlook(groundwater, rainfall),
         "schemes": schemes_list,
     }
 
