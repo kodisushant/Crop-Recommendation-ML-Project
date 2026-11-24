@@ -6,7 +6,7 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parents[2]
 FEATURES = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
 HARD_LIMITS = {"N": (0, 300), "P": (0, 300), "K": (0, 400), "temperature": (-5, 55),
-               "humidity": (0, 100), "ph": (0, 14), "rainfall": (0, 1000)}
+               "humidity": (0, 100), "ph": (0, 14), "rainfall": (0, 4000)}
 RNG = np.random.default_rng(42)
 
 model = joblib.load(BASE / "models/best_model.pkl")

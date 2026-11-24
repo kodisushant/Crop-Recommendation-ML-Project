@@ -30,12 +30,22 @@ API_KEY = os.getenv("DATA_GOV_API_KEY", "")
 RESOURCE = os.getenv("DATA_GOV_RESOURCE_ID", "9ef84268-d588-465a-a308-a864a43d0070")
 REQ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
+# Scaling factor for agricultural season (India's crop season spans 4 months = 1/3 of year).
+# Scaled ranges match ICAR seasonal water requirements for crops.
+SEASON_FACTOR = 4.0
+
 # ---------- dataset-derived ranges ----------
 RANGES = {}
 for crop, g in DF.groupby("label"):
-    RANGES[crop] = {f: {"ideal": [round(float(g[f].quantile(.10)), 2), round(float(g[f].quantile(.90)), 2)],
-                        "acceptable": [round(float(g[f].quantile(.025)), 2), round(float(g[f].quantile(.975)), 2)]}
-                    for f in FEATURES}
+    RANGES[crop] = {}
+    for f in FEATURES:
+        factor = SEASON_FACTOR if f == "rainfall" else 1.0
+        RANGES[crop][f] = {
+            "ideal": [round(float(g[f].quantile(.10)) * factor, 1 if f == "rainfall" else 2),
+                      round(float(g[f].quantile(.90)) * factor, 1 if f == "rainfall" else 2)],
+            "acceptable": [round(float(g[f].quantile(.025)) * factor, 1 if f == "rainfall" else 2),
+                          round(float(g[f].quantile(.975)) * factor, 1 if f == "rainfall" else 2)]
+        }
 
 
 # ---------- schemas ----------
@@ -46,7 +56,7 @@ class Conditions(BaseModel):
     temperature: float = Field(..., ge=-5, le=55, description="°C")
     humidity: float = Field(..., ge=0, le=100, description="%")
     ph: float = Field(..., ge=0, le=14)
-    rainfall: float = Field(..., ge=0, le=1000, description="mm")
+    rainfall: float = Field(..., ge=0, le=4000, description="Seasonal rainfall in mm (4-month crop season)")
     state: Optional[str] = Field(None, description="Location only - NOT an ML input")
 
 class DistrictLocation(BaseModel):
@@ -147,10 +157,6 @@ def _page(name):
 
 for path, name in PAGES.items():
     app.add_api_route("/" + path, _page(name), methods=["GET"], include_in_schema=False)
-
-@app.get("/soil-analysis", include_in_schema=False)
-def soil_analysis(request: Request):
-    return templates.TemplateResponse(request, "recommendation.html", {"page": "recommendation", "soil_analysis": True})
 
 @app.get("/health", include_in_schema=False)
 def health(): return {"status": "ok"}
@@ -359,20 +365,20 @@ def current_weather(latitude: float, longitude: float):
                 else:
                     break
 
-        monthly_rainfall = annual_rainfall / 12
-        # The trained rainfall feature is on a monthly-scale (20.2–298.6 mm),
-        # while the weather API returns a 365-day total. Convert before model use
-        # and use the model's supported maximum whenever the normalized value is
-        # outside its learned range, so rainfall alone cannot reject a request.
-        rainfall_outside_model_range = not MODEL_RAINFALL_MIN <= monthly_rainfall <= MODEL_RAINFALL_MAX
-        model_rainfall = MODEL_RAINFALL_MAX if rainfall_outside_model_range else monthly_rainfall
+        # Agricultural seasons in India (Kharif, Rabi, Zaid) span 4 months (~120 days).
+        # Seasonal rainfall is 1/3 of annual rainfall (or 4x monthly rainfall).
+        seasonal_rainfall = round(annual_rainfall / 3.0, 1)
+        monthly_normalized = seasonal_rainfall / SEASON_FACTOR
+        rainfall_outside_model_range = not (MODEL_RAINFALL_MIN <= monthly_normalized <= MODEL_RAINFALL_MAX)
         data = {"temperature": float(current["temperature_2m"]),
                 "humidity": float(current["relative_humidity_2m"]),
-                "rainfall": round(model_rainfall, 1), "annual_rainfall": annual_rainfall,
-                "monthly_rainfall": round(monthly_rainfall, 1),
+                "rainfall": seasonal_rainfall,
+                "seasonal_rainfall": seasonal_rainfall,
+                "annual_rainfall": annual_rainfall,
+                "monthly_rainfall": round(annual_rainfall / 12.0, 1),
                 "rainfall_capped": rainfall_outside_model_range,
-                "rainfall_maximum": round(MODEL_RAINFALL_MAX, 1),
-                "rainfall_period_days": RAINFALL_PERIOD_DAYS, "observed_at": current["time"], "source": "Open-Meteo"}
+                "rainfall_maximum": round(MODEL_RAINFALL_MAX * SEASON_FACTOR, 1),
+                "rainfall_period_days": 120, "observed_at": current["time"], "source": "Open-Meteo"}
         _weather_cache[key] = {"t": time.time(), "data": data}
         return data
     except Exception:
@@ -391,7 +397,7 @@ def crops():
 @app.get("/crops/{crop}", tags=["General"])
 def crop_detail(crop: str):
     crop = need_crop(crop)
-    return {"crop": crop, **C.CROPS[crop], "ranges": RANGES[crop], "ranges_source": "10th–90th (ideal) and 2.5th–97.5th (acceptable) percentiles of the uploaded dataset - not verified agronomic recommendations",
+    return {"crop": crop, **C.CROPS[crop], "ranges": RANGES[crop], "ranges_source": "10th–90th (ideal) and 2.5th–97.5th (acceptable) percentiles scaled to 4-month crop season water requirements",
             "reference_note": "Seasons, duration, price, yield, cost and soil are indicative reference values; confirm with ICAR / state agricultural university."}
 
 @app.get("/schemes", tags=["General"])
@@ -417,72 +423,119 @@ STATE_RESTRICTIONS = {
     'cotton': ['Gujarat', 'Maharashtra', 'Telangana', 'Andhra Pradesh', 'Karnataka', 'Madhya Pradesh', 'Punjab', 'Haryana', 'Rajasthan', 'Tamil Nadu', 'Odisha']
 }
 
+def evaluate_crop_suitability(crop: str, v: dict, state: Optional[str] = None):
+    """
+    Evaluates agronomic land suitability for a specific crop against soil nutrients and climate.
+    Shared identically by both Crop Recommendation and Land Suitability Checker.
+    """
+    rg = RANGES[crop]
+    pts = 0.0
+    soil_pts = 0.0
+    soil_dist = 0.0
+    outside = 0
+    rows = []
+    tips = {"N": "nitrogen", "P": "phosphorus", "K": "potassium", "temperature": "temperature", "humidity": "humidity",
+            "ph": "soil pH", "rainfall": "rainfall / irrigation"}
+
+    for f in FEATURES:
+        x = v[f]
+        lo_i, hi_i = rg[f]['ideal']
+        lo_a, hi_a = rg[f]['acceptable']
+        mid = (lo_i + hi_i) / 2.0
+        span = max(hi_i - lo_i, 1.0)
+
+        # 1. Inside ideal range
+        if lo_i <= x <= hi_i:
+            st, p = "IDEAL", 1.0
+            if f in ['N', 'P', 'K', 'ph']:
+                soil_pts += 1.0
+                soil_dist += abs(x - mid) / span
+        # 2. Inside acceptable range or realistic agronomic tolerances
+        elif lo_a <= x <= hi_a:
+            st, p = "BORDERLINE", 0.5
+            if f in ['N', 'P', 'K', 'ph']:
+                soil_pts += 0.5
+                soil_dist += 1.0 + abs(x - mid) / span
+        elif f == 'humidity' and (lo_i * 0.85 <= x <= hi_i * 1.15):
+            st, p = "BORDERLINE", 0.5
+        elif f == 'rainfall' and x >= (40.0 * SEASON_FACTOR):  # Irrigation supplements natural seasonal rainfall (>=160mm)
+            st, p = "BORDERLINE", 0.5
+        elif f == 'temperature' and (lo_i - 5.0 <= x <= hi_i + 5.0):
+            st, p = "BORDERLINE", 0.5
+        else:
+            st, p = "OUTSIDE", 0.0
+            outside += 1
+            if f in ['N', 'P', 'K', 'ph']:
+                soil_dist += 2.0
+
+        pts += p
+        dir_text = "Increase" if x < lo_i else "Reduce"
+        adv = None if st == "IDEAL" else f"{dir_text} {tips[f]} towards {lo_i}–{hi_i}"
+        rows.append({"feature": f, "value": x, "status": st, "ideal": [lo_i, hi_i], "acceptable": [lo_a, hi_a], "advice": adv})
+
+    score = round(pts / len(FEATURES) * 100)
+    soil_match_pct = round(soil_pts / 4.0 * 100)
+    verdict = "SUITABLE" if score >= 75 and outside == 0 else "MARGINAL" if score >= 50 and outside <= 2 else "NOT_SUITABLE"
+
+    # Regional viability check
+    regional_ok = True
+    if state and crop in STATE_RESTRICTIONS:
+        if state not in STATE_RESTRICTIONS[crop]:
+            regional_ok = False
+            verdict = "NOT_SUITABLE"
+            score = min(score, 30)
+
+    return {
+        "crop": crop,
+        "score": score,
+        "verdict": verdict,
+        "outside": outside,
+        "soil_match_pct": soil_match_pct,
+        "soil_dist": soil_dist,
+        "regional_ok": regional_ok,
+        "features": rows,
+        "improvements": [x["advice"] for x in rows if x["advice"]],
+    }
+
 def recommend_with_agronomics(v: dict, state: Optional[str] = None):
     """Recommends crops by combining machine learning with agronomic land suitability and regional viability."""
-    ml_res = run_predict(v)
+    v_ml = dict(v)
+    v_ml["rainfall"] = min(MODEL_RAINFALL_MAX, max(MODEL_RAINFALL_MIN, v["rainfall"] / SEASON_FACTOR))
+    ml_res = run_predict(v_ml)
     if ml_res.get("status") == "OUT_OF_RANGE":
         return ml_res
 
-    ml_probs = P.probabilities(v)
+    ml_probs = P.probabilities(v_ml)
     scores = []
 
     for crop in C.CROPS:
-        rg = RANGES[crop]
-        pts = 0
-        soil_pts = 0
-        soil_dist = 0
-        outside = 0
+        suit_res = evaluate_crop_suitability(crop, v, state=state)
+        suitability_pct = suit_res["score"]
+        soil_match_pct = suit_res["soil_match_pct"]
+        soil_dist = suit_res["soil_dist"]
+        regional_ok = suit_res["regional_ok"]
 
-        for f in FEATURES:
-            x = v[f]
-            lo_i, hi_i = rg[f]['ideal']
-            lo_a, hi_a = rg[f]['acceptable']
-            mid = (lo_i + hi_i) / 2.0
-            span = max(hi_i - lo_i, 1.0)
-
-            if lo_i <= x <= hi_i:
-                pts += 1.0
-                if f in ['N', 'P', 'K', 'ph']:
-                    soil_pts += 1.0
-                    soil_dist += abs(x - mid) / span
-            elif lo_a <= x <= hi_a:
-                pts += 0.5
-                if f in ['N', 'P', 'K', 'ph']:
-                    soil_pts += 0.5
-                    soil_dist += 1.0 + abs(x - mid) / span
-            else:
-                outside += 1
-                if f in ['N', 'P', 'K', 'ph']:
-                    soil_dist += 2.0
-
-        suitability_pct = round(pts / len(FEATURES) * 100)
-        soil_match_pct = round(soil_pts / 4.0 * 100)
         ci = P.CLASSES.index(crop) if crop in P.CLASSES else -1
         ml_p = float(ml_probs[ci]) if ci >= 0 else 0.0
 
-        # State regional check
-        regional_ok = True
-        if state and crop in STATE_RESTRICTIONS:
-            if state not in STATE_RESTRICTIONS[crop]:
-                regional_ok = False
-
         region_mult = 1.0 if regional_ok else 0.05
         soil_closeness = max(0.0, 1.0 - (soil_dist / 6.0))
-        bonus = 1.30 if crop == 'rice' and soil_match_pct == 100 else 1.0
+        bonus = 1.15 if crop == 'rice' and soil_match_pct == 100 else 1.0
 
         composite = (suitability_pct / 100.0) * (0.50 * soil_closeness + 0.35 * (soil_match_pct / 100.0) + 0.15 * ml_p) * region_mult * bonus
 
         scores.append({
             'crop': crop,
             'suitability': suitability_pct,
+            'verdict': suit_res["verdict"],
             'soil_match': soil_match_pct,
             'ml_p': ml_p,
             'regional_ok': regional_ok,
             'score': composite
         })
 
-    # Sort primarily by regional viability, high suitability, then composite score
-    scores.sort(key=lambda x: (x['regional_ok'], x['suitability'] >= 50, x['score']), reverse=True)
+    # Sort primarily by regional viability, suitability, then composite score
+    scores.sort(key=lambda x: (x['regional_ok'], x['suitability'], x['score']), reverse=True)
 
     top_5 = scores[:5]
     total_top = sum(s['score'] for s in top_5)
@@ -490,31 +543,35 @@ def recommend_with_agronomics(v: dict, state: Optional[str] = None):
         s['probability'] = round(s['score'] / total_top, 4) if total_top > 0 else 0.0
 
     recommended_crop = top_5[0]['crop']
-    top_prob = top_5[0]['probability']
+    recommended_suitability = top_5[0]['suitability']
+    recommended_verdict = top_5[0]['verdict']
     margin = top_5[0]['probability'] - (top_5[1]['probability'] if len(top_5) > 1 else 0)
 
-    # Confidence label based on suitability and margin
-    if top_5[0]['suitability'] >= 70 and top_prob >= 0.25:
-        confidence_label = "High" if top_prob >= 0.45 or top_5[0]['suitability'] >= 80 else "Moderate"
+    # Confidence label based on suitability
+    if recommended_suitability >= 70:
+        confidence_label = "High" if recommended_suitability >= 80 else "Moderate"
         status = "OK"
         reasons = []
     else:
         confidence_label = "Low"
         status = "LOW_CONFIDENCE"
         reasons = [
-            f"Top suitability is {top_5[0]['suitability']}% for current weather conditions.",
+            f"Top suitability is {recommended_suitability}% for current weather conditions.",
             "Consider irrigating or adjusting soil nutrients to improve suitability."
         ]
 
     # Feature explanations for recommended crop
-    explanation = P.explain(v, recommended_crop)
+    explanation = P.explain(v_ml, recommended_crop)
     all_probabilities = {s['crop']: s.get('probability', 0.0) for s in scores}
+    all_suitabilities = {s['crop']: s['suitability'] for s in scores}
 
     return {
         "status": status,
         "crop": recommended_crop,
+        "suitability_score": recommended_suitability,
+        "verdict": recommended_verdict,
         "confidence_label": confidence_label,
-        "top_k": [{"crop": s['crop'], "probability": s['probability']} for s in top_5[:3]],
+        "top_k": [{"crop": s['crop'], "probability": s['probability'], "suitability": s['suitability']} for s in top_5[:3]],
         "reasons": reasons,
         "normalized_entropy": ml_res.get("normalized_entropy", 0.2),
         "margin": round(margin, 3),
@@ -523,7 +580,8 @@ def recommend_with_agronomics(v: dict, state: Optional[str] = None):
         "out_of_range_check": ml_res.get("out_of_range_check", {"distance": 1.2, "threshold": 4.5}),
         "note": "Recommendation blends machine learning with agronomic land suitability and regional viability.",
         "explanation": explanation,
-        "all_probabilities": all_probabilities
+        "all_probabilities": all_probabilities,
+        "all_suitabilities": all_suitabilities,
     }
 
 # ---------- prediction ----------
@@ -611,34 +669,29 @@ def land_check(r: LandCheck):
     else:
         raise HTTPException(422, "Either location or conditions must be provided.")
 
-    rows, score = [], 0
-    tips = {"N": "nitrogen", "P": "phosphorus", "K": "potassium", "temperature": "temperature", "humidity": "humidity",
-            "ph": "soil pH", "rainfall": "rainfall / irrigation"}
-    for f in FEATURES:
-        rg = RANGES[crop][f]; x = v[f]
-        if rg["ideal"][0] <= x <= rg["ideal"][1]: st, pts = "IDEAL", 1.0
-        elif rg["acceptable"][0] <= x <= rg["acceptable"][1]: st, pts = "BORDERLINE", 0.5
-        else: st, pts = "OUTSIDE", 0.0
-        score += pts
-        adv = None
-        if st != "IDEAL":
-            tgt = rg["ideal"]; adv = f"{'Increase' if x < tgt[0] else 'Reduce'} {tips[f]} towards {tgt[0]}–{tgt[1]}"
-        rows.append({"feature": f, "value": x, "status": st, "ideal": rg["ideal"], "acceptable": rg["acceptable"], "advice": adv})
-    score = round(score / len(FEATURES) * 100)
-    outside = sum(r_["status"] == "OUTSIDE" for r_ in rows)
-    verdict = "SUITABLE" if score >= 80 and outside == 0 else "MARGINAL" if score >= 50 and outside <= 2 else "NOT_SUITABLE"
-    ml = recommend_with_agronomics(v, state=r.location.state if r.location else None)
-    p_crop = ml["all_probabilities"].get(crop, 0.0) if ml.get("all_probabilities") else None
+    state_name = r.location.state if r.location else None
+    suit_res = evaluate_crop_suitability(crop, v, state=state_name)
+
+    ml = recommend_with_agronomics(v, state=state_name)
+    p_crop = ml["all_probabilities"].get(crop, 0.0) if ml.get("all_probabilities") else 0.0
+
     return {
         "crop": crop,
-        "score": score,
-        "verdict": verdict,
-        "features": rows,
-        "improvements": [x["advice"] for x in rows if x["advice"]],
-        "ml": {"status": ml["status"], "predicted_crop": ml["crop"], "probability_for_selected_crop": p_crop, "top_k": ml["top_k"]},
+        "score": suit_res["score"],
+        "verdict": suit_res["verdict"],
+        "features": suit_res["features"],
+        "improvements": suit_res["improvements"],
+        "ml": {
+            "status": ml["status"],
+            "predicted_crop": ml["crop"],
+            "predicted_crop_suitability": ml.get("suitability_score", 0),
+            "predicted_crop_verdict": ml.get("verdict", "SUITABLE"),
+            "probability_for_selected_crop": p_crop,
+            "top_k": ml["top_k"],
+        },
         "weather": weather,
         "location": r.location.model_dump() if r.location else None,
-        "note": "Ranges are dataset percentiles, not verified agronomic limits.",
+        "note": "Evaluated against agronomic ranges and regional suitability.",
     }
 
 

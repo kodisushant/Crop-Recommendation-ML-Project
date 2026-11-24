@@ -1,16 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}{% if soil_analysis %}Soil Analysis{% else %}Crop Recommendation{% endif %}{% endblock %}
+{% block title %}Crop Recommendation{% endblock %}
 
 {% block body %}
 <!-- Page Header -->
 <div class="app-head">
     <div class="wrap">
-        <h1>{% if soil_analysis %}Soil Analysis{% else %}Crop Recommendation{% endif %}</h1>
-        <p>{% if soil_analysis %}Enter soil values and select your district. Current weather is fetched automatically to
-            analyze which soil nutrients and features drive the prediction.{% else %}Enter soil values and select your
-            district. Current temperature, humidity, and precipitation are fetched automatically for the
-            recommendation.{% endif %}</p>
+        <h1>Crop Recommendation</h1>
+        <p>Enter soil values and select your district. Current temperature, humidity, and precipitation are fetched automatically for the recommendation.</p>
     </div>
 </div>
 
@@ -98,16 +95,14 @@
                     </div>
 
                     <div class="hint">Type or click to see auto suggestions for State and District. Temperature,
-                        humidity, and rainfall are retrieved automatically when you recommend.</div>
+                        humidity, and seasonal rainfall are retrieved automatically when you recommend.</div>
                 </div>
 
                 <!-- Action Buttons -->
                 <div class="inl">
                     <button class="btn" id="go" type="submit">
                         <span class="spinner"></span>
-                        <i
-                            class="fa-solid {% if soil_analysis %}fa-magnifying-glass-chart{% else %}fa-wand-magic-sparkles{% endif %}"></i>
-                        {% if soil_analysis %}Analyze Soil &amp; Features{% else %}Recommend crop{% endif %}
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Recommend crop
                     </button>
                     <button type="button" class="btn ghost" id="fill-example">
                         <i class="fa-solid fa-flask-vial"></i> Use example

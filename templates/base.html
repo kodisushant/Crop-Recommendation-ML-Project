@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 
-<body data-page="{{ page }}" {% if soil_analysis %} data-analysis-mode="soil" {% endif %}>
+<body data-page="{{ page }}">
     <!-- Navigation Bar -->
     <header class="nav">
         <div class="wrap">
@@ -46,7 +46,6 @@
                         Tools <i class="fa-solid fa-chevron-down"></i>
                     </button>
                     <div class="dd-m">
-                        <a href="/soil-analysis"><i class="fa-solid fa-vial"></i> Soil Analysis</a>
                         <a href="/ideal-conditions"><i class="fa-solid fa-ruler-combined"></i> Ideal Conditions</a>
                         <a href="/land-check"><i class="fa-solid fa-map"></i> Land Suitability</a>
                         <a href="/fertilizer"><i class="fa-solid fa-flask"></i> Fertilizer Planning</a>

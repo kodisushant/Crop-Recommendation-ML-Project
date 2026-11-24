@@ -82,13 +82,13 @@ const FIELD_DEFINITIONS = {
         step: 0.1
     },
     rainfall: {
-        label: "Rainfall",
+        label: "Seasonal Rainfall",
         unit: "mm",
         min: 0,
-        max: 1000,
+        max: 4000,
         defaultValue: 203,
         icon: "fa-cloud-rain",
-        description: "Rainfall",
+        description: "Seasonal rainfall (crop season)",
         group: "Weather Conditions",
         step: 0.1
     }
@@ -787,8 +787,8 @@ function displayRecommendationResult(result) {
                 <div class="kv">
                     <div><b>${result.weather.temperature.toFixed(1)}°C</b><span>Current temperature</span></div>
                     <div><b>${result.weather.humidity.toFixed(0)}%</b><span>Current humidity</span></div>
-                    <div><b>${result.weather.annual_rainfall.toFixed(1)} mm</b><span>Rainfall, previous ${result.weather.rainfall_period_days} days</span></div>
-                    <div><b>${result.weather.rainfall.toFixed(1)} mm</b><span>Monthly rainfall used by model</span></div>
+                    <div><b>${result.weather.annual_rainfall ? result.weather.annual_rainfall.toFixed(1) : result.weather.rainfall.toFixed(1)} mm</b><span>Annual rainfall (365 days)</span></div>
+                    <div><b>${(result.weather.seasonal_rainfall || result.weather.rainfall).toFixed(1)} mm</b><span>Seasonal rainfall (crop season)</span></div>
                 </div>
             </div>
         `;
@@ -805,22 +805,24 @@ function displayRecommendationResult(result) {
                 </ul>
             </div>
         `;
-    } 
+    }
     // CASE B: Valid Recommendation (OK or LOW_CONFIDENCE)
     else {
         const topCrop = result.top_k[0];
-        const statusBadgeClass = status === "OK" ? "ok" : "low";
+        const displayScore = result.suitability_score !== undefined ? result.suitability_score : Math.round(topCrop.probability * 100);
+        const displayVerdict = result.verdict || (status === "OK" ? "SUITABLE" : "MARGINAL");
+        const statusBadgeClass = displayVerdict === "SUITABLE" ? "ok" : (displayVerdict === "MARGINAL" ? "low" : "out");
 
         htmlContent += `
             <div class="result-top">
-                <span class="badge b-${statusBadgeClass}">${status.replace("_", " ")}</span>
+                <span class="badge b-${statusBadgeClass}">${displayVerdict.replace("_", " ")}</span>
                 <div style="margin-top:8px;opacity:.85">Recommended crop</div>
                 <h2>${capitalizeFirstLetter(topCrop.crop)}</h2>
                 <div class="meter">
-                    <i style="width:${topCrop.probability * 100}%"></i>
+                    <i style="width:${displayScore}%"></i>
                 </div>
-                <div>
-                    Model probability <b>${(topCrop.probability * 100).toFixed(1)}%</b> · Confidence <b>${result.confidence_label}</b>
+                <div style="margin-top:8px;font-size:1.05rem">
+                    Land Suitability <b>${displayScore}%</b> · Confidence <b>${result.confidence_label}</b>
                 </div>
                 ${result.schemes && result.schemes.length > 0 ? `
                     <div style="margin-top:14px">
@@ -844,47 +846,24 @@ function displayRecommendationResult(result) {
             `;
         }
 
-        const isSoilMode = document.body.dataset.analysisMode === "soil";
-
-        if (isSoilMode) {
-            // In Soil Analysis mode, present the Soil & Feature Drivers first
-            htmlContent += `
-                <div class="panel" id="soil-analysis-panel">
-                    <h3><i class="fa-solid fa-magnifying-glass-chart"></i> Soil &amp; Feature Driver Analysis</h3>
-                    <div class="chart-box" style="height:260px">
-                        <canvas id="c-exp"></canvas>
-                    </div>
-                    <div class="note">
-                        Feature influence on ${capitalizeFirstLetter(topCrop.crop)}: Positive values (green) push towards this crop based on your soil nutrients and climate.
-                    </div>
+        // Top 3 Crops Graph Container
+        htmlContent += `
+            <div class="panel">
+                <h3><i class="fa-solid fa-ranking-star"></i> Top 3 Recommended Crops</h3>
+                <div class="chart-box" style="height:200px">
+                    <canvas id="c-top"></canvas>
                 </div>
-                <div class="panel">
-                    <h3><i class="fa-solid fa-ranking-star"></i> Top 3 Recommended Crops</h3>
-                    <div class="chart-box" style="height:200px">
-                        <canvas id="c-top"></canvas>
-                    </div>
+            </div>
+            <div class="panel">
+                <h3><i class="fa-solid fa-magnifying-glass-chart"></i> What Drove This Prediction</h3>
+                <div class="chart-box" style="height:260px">
+                    <canvas id="c-exp"></canvas>
                 </div>
-            `;
-        } else {
-            // In Crop Recommendation mode, show Top 3 Crops first
-            htmlContent += `
-                <div class="panel">
-                    <h3><i class="fa-solid fa-ranking-star"></i> Top 3 Recommended Crops</h3>
-                    <div class="chart-box" style="height:200px">
-                        <canvas id="c-top"></canvas>
-                    </div>
+                <div class="note">
+                    Positive values push towards ${capitalizeFirstLetter(topCrop.crop)}. Feature effect estimated via model-agnostic random permutation occlusion.
                 </div>
-                <div class="panel" id="soil-analysis-panel">
-                    <h3><i class="fa-solid fa-magnifying-glass-chart"></i> What Drove This Prediction</h3>
-                    <div class="chart-box" style="height:260px">
-                        <canvas id="c-exp"></canvas>
-                    </div>
-                    <div class="note">
-                        Positive values push towards ${capitalizeFirstLetter(topCrop.crop)}. Feature effect estimated via model-agnostic random permutation occlusion.
-                    </div>
-                </div>
-            `;
-        }
+            </div>
+        `;
     }
 
     // Reliability & Sensitivity Diagnostics
@@ -919,14 +898,14 @@ function displayRecommendationResult(result) {
 
     // Render Charts if recommendation was valid
     if (status !== "OUT_OF_RANGE") {
-        // Chart 1: Top 3 Crop Probabilities
+        // Chart 1: Top 3 Crops Land Suitability
         if (result.top_k && Array.isArray(result.top_k)) {
             renderChart("c-top", {
                 type: "bar",
                 data: {
                     labels: result.top_k.map(item => capitalizeFirstLetter(item.crop)),
                     datasets: [{
-                        data: result.top_k.map(item => item.probability * 100),
+                        data: result.top_k.map(item => item.suitability !== undefined ? item.suitability : Math.round(item.probability * 100)),
                         backgroundColor: CHART_COLORS
                     }]
                 },
@@ -934,7 +913,7 @@ function displayRecommendationResult(result) {
                     indexAxis: "y",
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { max: 100, title: { display: true, text: "Probability (%)" } }
+                        x: { max: 100, title: { display: true, text: "Land Suitability (%)" } }
                     }
                 }
             });
@@ -1092,7 +1071,7 @@ pageControllers.land_check = async function () {
                             </div>
                             <div class="metric">
                                 <span class="metric-val">${result.weather.rainfall} mm</span>
-                                <span class="metric-lbl"><i class="fa-solid fa-cloud-rain"></i> Rainfall</span>
+                                <span class="metric-lbl"><i class="fa-solid fa-cloud-rain"></i> Seasonal Rainfall</span>
                             </div>
                         </div>
                     </div>
@@ -1122,27 +1101,27 @@ pageControllers.land_check = async function () {
 
                 <div class="panel">
                     <h3><i class="fa-solid fa-screwdriver-wrench"></i> What to Improve</h3>
-                    ${result.improvements.length > 0 
-                        ? `<ul>${result.improvements.map(tip => `<li>${tip}</li>`).join("")}</ul>`
-                        : "<p>All soil and climate conditions are within the crop's ideal range.</p>"
-                    }
+                    ${result.improvements.length > 0
+                    ? `<ul>${result.improvements.map(tip => `<li>${tip}</li>`).join("")}</ul>`
+                    : "<p>All soil and climate conditions are within the crop's ideal range.</p>"
+                }
                 </div>
 
                 <div class="panel">
                     <h3><i class="fa-solid fa-brain"></i> Machine Learning Opinion</h3>
                     ${result.ml.status === "OUT_OF_RANGE"
-                        ? `<div class="alert bad">Inputs are out of the model's range – no ML opinion available.</div>`
-                        : `
+                    ? `<div class="alert bad">Inputs are out of the model's range – no ML opinion available.</div>`
+                    : `
                             <p>
                                 Model's top recommendation for this land: <b>${capitalizeFirstLetter(result.ml.predicted_crop)}</b> 
-                                (${renderBadge(result.ml.status === "OK" ? "ok" : "low", result.ml.status.replace("_", " "))}).
+                                (${renderBadge(result.ml.predicted_crop_verdict === "SUITABLE" ? "ok" : "low", result.ml.predicted_crop_verdict || "SUITABLE")} · <b>${result.ml.predicted_crop_suitability}% suitability</b>).
                             </p>
                             <p>
-                                Probability score for <b>${capitalizeFirstLetter(result.crop)}</b>: 
-                                <b>${((result.ml.probability_for_selected_crop || 0) * 100).toFixed(1)}%</b>.
+                                Suitability score for <b>${capitalizeFirstLetter(result.crop)}</b>: 
+                                <b>${result.score}%</b> (${renderBadge(result.verdict === "SUITABLE" ? "ok" : (result.verdict === "MARGINAL" ? "low" : "out"), result.verdict)}).
                             </p>
                         `
-                    }
+                }
                     <div class="note">${result.note}</div>
                 </div>
             `;
@@ -1611,8 +1590,8 @@ pageControllers.what_if = async function () {
                 <div class="panel">
                     <h3><i class="fa-solid fa-chart-line"></i> Sensitivity Sweep: ${FIELD_DEFINITIONS[sweepResponse.feature].label}</h3>
                     <div class="chart-box"><canvas id="c-sw"></canvas></div>
-                    ${sweepResponse.tipping_points.length > 0 
-                        ? `
+                    ${sweepResponse.tipping_points.length > 0
+                    ? `
                             <div class="alert">
                                 <b>Tipping Points Identified:</b>
                                 <ul>
@@ -1622,8 +1601,8 @@ pageControllers.what_if = async function () {
                                 </ul>
                             </div>
                         `
-                        : `<p class="note">The recommended top crop remains constant across this entire range.</p>`
-                    }
+                    : `<p class="note">The recommended top crop remains constant across this entire range.</p>`
+                }
                 </div>
             `;
 
