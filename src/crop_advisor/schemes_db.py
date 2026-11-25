@@ -55,9 +55,9 @@ SEED_SCHEMES = [
         "state": "ALL",
         "crop_category": "ALL",
         "applicable_crops": "ALL",
-        "benefits": "Comprehensive insurance coverage against crop loss from pre-sowing to post-harvest. Farmers pay a nominal premium: 1.5% for Rabi, 2% for Kharif foodgrains/oilseeds, and 5% for horticultural/commercial crops.",
-        "eligibility": "All farmers growing notified crops with land ownership or valid tenancy/sharecropper records.",
-        "how_to_apply": "Apply through the official PMFBY portal, nearest CSC center, or bank branch before the seasonal cut-off date.",
+        "benefits": "Insurance for notified crops against specified weather, pest, and disaster losses. Coverage, premium, and enrolment are available only where the State or UT has notified the crop, area, and season.",
+        "eligibility": "Farmers growing a crop that is notified for their district or insurance unit in the current season, subject to the State or UT notification.",
+        "how_to_apply": "First confirm that your crop, area, and season are notified by the State or UT. Then apply through PMFBY, a CSC, or bank before the seasonal cut-off date.",
         "portal_link": "https://pmfby.gov.in",
     },
     {
@@ -67,8 +67,8 @@ SEED_SCHEMES = [
         "crop_category": "ALL",
         "applicable_crops": "ALL",
         "benefits": "Direct annual financial support of Rs. 6,000 delivered in three equal installments of Rs. 2,000 directly into the farmer's Aadhaar-linked bank account.",
-        "eligibility": "All landholding farmer families with cultivable agricultural land.",
-        "how_to_apply": "Self-register on pmkisan.gov.in or visit a local Common Service Centre (CSC) with Aadhaar and land records.",
+        "eligibility": "Eligible landholding farmer families, subject to the scheme's exclusion criteria and verification by the State or UT administration.",
+        "how_to_apply": "Self-register on pmkisan.gov.in or visit a local Common Service Centre (CSC) with Aadhaar and land records; complete required eKYC.",
         "portal_link": "https://pmkisan.gov.in",
     },
     {
@@ -529,6 +529,19 @@ SEED_SCHEMES = [
         "how_to_apply": "Register with the Directorate of Agriculture, Krishi Bhavan, Tonca, Caranzalem, Goa.",
         "portal_link": "https://agri.goa.gov.in",
     },
+
+    # ==================== ANDAMAN & NICOBAR ISLANDS UT PROGRAMMES ====================
+    {
+        "name": "A&N Agriculture Department and ATMA Farmer Support",
+        "level": "Union Territory",
+        "state": "Andaman and Nicobar Islands",
+        "crop_category": "ALL",
+        "applicable_crops": "ALL",
+        "benefits": "Farmer training, demonstrations, exposure visits, farm schools, farmer-scientist interaction, and agricultural technology support through ATMA and the UT Agriculture Department.",
+        "eligibility": "Farmers and farmer groups in Andaman and Nicobar Islands. Specific activities, locations, and enrolment conditions are decided by the UT Agriculture Department.",
+        "how_to_apply": "Contact the local Agriculture Department or ATMA office to confirm the current activity, district coverage, documents, and enrolment process.",
+        "portal_link": "https://agri.andamannicobar.gov.in/atma",
+    },
 ]
 
 
@@ -552,18 +565,23 @@ def init_db() -> None:
         )
     """)
 
-    # Insert or update all seed schemes
+    # Insert or update all seed schemes so corrections reach existing installations.
     for s in SEED_SCHEMES:
+        values = (s["level"], s["state"], s["crop_category"], s["applicable_crops"],
+                  s["benefits"], s["eligibility"], s["how_to_apply"], s["portal_link"])
         cursor.execute("SELECT id FROM schemes WHERE name = ?", (s["name"],))
-        if cursor.fetchone() is None:
+        existing = cursor.fetchone()
+        if existing:
+            cursor.execute("""
+                UPDATE schemes SET level = ?, state = ?, crop_category = ?, applicable_crops = ?,
+                    benefits = ?, eligibility = ?, how_to_apply = ?, portal_link = ?
+                WHERE id = ?
+            """, (*values, existing[0]))
+        else:
             cursor.execute("""
                 INSERT INTO schemes (name, level, state, crop_category, applicable_crops, benefits, eligibility, how_to_apply, portal_link)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                s["name"], s["level"], s["state"], s["crop_category"],
-                s["applicable_crops"], s["benefits"], s["eligibility"],
-                s["how_to_apply"], s["portal_link"]
-            ))
+            """, (s["name"], *values))
     conn.commit()
     conn.close()
 

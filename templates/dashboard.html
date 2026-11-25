@@ -7,47 +7,15 @@
 <div class="app-head">
     <div class="wrap">
         <h1>Dashboard</h1>
-        <p>Your overview of model performance metrics, quick tools, and recent local predictions.</p>
+        <p>Quick access to crop planning tools and local decision support.</p>
     </div>
 </div>
 
 <!-- Main Application Content -->
 <main class="app">
     <div class="wrap">
-        <!-- Metric Statistics Cards -->
-        <div class="grid g4">
-            <div class="card stat">
-                <div class="ico"><i class="fa-solid fa-wheat-awn"></i></div>
-                <div>
-                    <b id="d-crops">–</b>
-                    <span>Supported crops</span>
-                </div>
-            </div>
-            <div class="card stat">
-                <div class="ico"><i class="fa-solid fa-brain"></i></div>
-                <div>
-                    <b id="d-model">–</b>
-                    <span>Best production model</span>
-                </div>
-            </div>
-            <div class="card stat">
-                <div class="ico"><i class="fa-solid fa-bullseye"></i></div>
-                <div>
-                    <b id="d-acc">–</b>
-                    <span>Test accuracy</span>
-                </div>
-            </div>
-            <div class="card stat">
-                <div class="ico"><i class="fa-solid fa-database"></i></div>
-                <div>
-                    <b id="d-rows">–</b>
-                    <span>Training records</span>
-                </div>
-            </div>
-        </div>
-
         <!-- Quick Access Tools Section -->
-        <h2 style="margin-top:36px">Quick Tools</h2>
+        <h2>Quick Tools</h2>
         <div class="grid g4">
             <a class="card" href="/recommendation">
                 <div class="ico"><i class="fa-solid fa-seedling"></i></div>
@@ -85,18 +53,6 @@
                 <div class="ico"><i class="fa-solid fa-cloud-sun-rain"></i></div>
                 <h3>Weather Forecast</h3>
             </a>
-        </div>
-
-        <!-- Model comparison -->
-        <div style="margin-top:30px">
-            <!-- Model Accuracy Comparison Chart -->
-            <div class="panel">
-                <h3><i class="fa-solid fa-chart-column"></i> Model Comparison (CV vs Test)</h3>
-                <div class="chart-box">
-                    <canvas id="c-models"></canvas>
-                </div>
-            </div>
-
         </div>
     </div>
 </main>

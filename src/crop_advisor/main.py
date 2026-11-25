@@ -1,5 +1,6 @@
 """Crop Advisor - FastAPI backend. Serves the API (/docs) AND the website (templates + static)."""
 import os, time, logging, requests, numpy as np, pandas as pd
+from difflib import get_close_matches
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional, Dict, Literal
@@ -164,6 +165,8 @@ def meta():
 
 _states = {"t": 0, "data": None}
 _weather_cache = {}
+_coordinate_cache = {}
+_rainfall_forecast_cache = {}
 _groundwater_data = None
 RAINFALL_PERIOD_DAYS = 365
 MODEL_RAINFALL_MIN = float(P.ood["min"]["rainfall"])
@@ -192,6 +195,18 @@ def normalized_place_name(value: str):
     cleaned = value.lower().replace("&", "and")
     cleaned = re.sub(r"\b(ut|union\s*territory)\b", "", cleaned)
     return re.sub(r"[^a-z]", "", cleaned)
+
+DISTRICT_ALIASES = {
+    "goa": {"goanorth": "northgoa", "goasouth": "southgoa"},
+    "andhrapradesh": {"kadapa": "ysr", "ysrkadapa": "ysr"},
+    "telangana": {"komarambheemasifabad": "kumurambheemasifabad", "jagtial": "jagitial",
+                  "peddapalle": "peddapalli", "rajannasircilla": "rajannasircilla"},
+    "westbengal": {"haora": "howrah", "hugli": "hooghly", "puruliya": "purulia",
+                    "kolkatta": "kolkata", "kochbihar": "coochbehar"},
+}
+
+def district_token_key(value: str):
+    return "".join(sorted(re.findall(r"[a-z]+", value.lower())))
 
 def district_data():
     """Load the complete India state/district catalog and cache it for one day."""
@@ -284,9 +299,18 @@ def district_coordinates(location: DistrictLocation):
     if not districts_for_state or not any(normalized_place_name(name) == dist_key for name in districts_for_state):
         raise HTTPException(422, "Choose a district from the suggestions for the selected State / UT.")
 
+    cache_key = (state_key, dist_key)
+    hit = _coordinate_cache.get(cache_key)
+    if hit and time.time() - hit["t"] < 24 * 3600:
+        return hit["data"]
+
+    def remember(coords):
+        _coordinate_cache[cache_key] = {"t": time.time(), "data": coords}
+        return coords
+
     # 1. Direct match in known district coordinates fallback table
     if (state_key, dist_key) in DISTRICT_COORDINATE_FALLBACKS:
-        return DISTRICT_COORDINATE_FALLBACKS[(state_key, dist_key)]
+        return remember(DISTRICT_COORDINATE_FALLBACKS[(state_key, dist_key)])
 
     # 2. Check Open-Meteo geocoding API
     try:
@@ -300,18 +324,18 @@ def district_coordinates(location: DistrictLocation):
         for place in response.json().get("results", []):
             admin1 = normalized_place_name(place.get("admin1") or "")
             if place.get("country_code") == "IN" and (admin1 == wanted or wanted in admin1 or admin1 in wanted):
-                return float(place["latitude"]), float(place["longitude"])
+                return remember((float(place["latitude"]), float(place["longitude"])))
     except requests.RequestException:
         pass
 
     # 3. Fuzzy match in known district fallbacks
     for (s_k, d_k), coords in DISTRICT_COORDINATE_FALLBACKS.items():
         if s_k == state_key and (d_k in dist_key or dist_key in d_k):
-            return coords
+            return remember(coords)
 
     # 4. State center fallback for small states / UTs
     if state_key in STATE_CENTERS:
-        return STATE_CENTERS[state_key]
+        return remember(STATE_CENTERS[state_key])
 
     raise HTTPException(422, "Could not locate that district. Please choose another district from the list.")
 
@@ -395,6 +419,7 @@ def groundwater_observation(state: str, district: str):
             data = pd.read_csv(path)
             data["state_key"] = data["state"].map(normalized_place_name)
             data["district_key"] = data["district"].map(normalized_place_name)
+            data["district_token_key"] = data["district"].map(district_token_key)
             _groundwater_data = data
         except (OSError, ValueError, KeyError) as e:
             log.warning("Groundwater dataset unavailable: %s", e)
@@ -404,18 +429,38 @@ def groundwater_observation(state: str, district: str):
     district_key = normalized_place_name(district)
     rows = _groundwater_data[_groundwater_data["state_key"] == state_key]
     exact = rows[rows["district_key"] == district_key]
+    match_method = "Exact"
     if exact.empty:
-        exact = rows[rows["district_key"].map(lambda value: value in district_key or district_key in value)]
+        alias_key = DISTRICT_ALIASES.get(state_key, {}).get(district_key)
+        if alias_key:
+            exact = rows[rows["district_key"] == alias_key]
+            match_method = "Alias"
+    if exact.empty:
+        exact = rows[rows["district_token_key"] == district_token_key(district)]
+        match_method = "Reordered name"
+    if exact.empty and not rows.empty:
+        closest = get_close_matches(district_key, rows["district_key"].drop_duplicates().tolist(), n=1, cutoff=0.90)
+        if closest:
+            exact = rows[rows["district_key"] == closest[0]]
+            match_method = "Spelling variation"
     if exact.empty:
         return {"available": False, "message": "No January 2026 monitoring-well reading is available for this district."}
 
     levels = exact["dtwl_mbgl"]
     median = round(float(levels.median()), 2)
     condition = "Shallow" if median <= 5 else "Moderate" if median <= 10 else "Deep"
+    wells = int(exact[["latitude", "longitude", "observation_date"]].drop_duplicates().shape[0])
+    evidence = "High" if wells >= 10 else "Moderate" if wells >= 4 else "Limited"
     return {
         "available": True,
         "observation_month": "January 2026",
-        "monitoring_wells": int(exact[["latitude", "longitude", "observation_date"]].drop_duplicates().shape[0]),
+        "source": "January 2026 groundwater monitoring CSV snapshot",
+        "observation_date": str(exact["observation_date"].max()),
+        "matched_district": str(exact["district"].mode().iat[0]),
+        "match_method": match_method,
+        "monitoring_wells": wells,
+        "evidence": evidence,
+        "source_records": int(exact.get("source_record_count", pd.Series(1, index=exact.index)).sum()),
         "median_dtwl_mbgl": median,
         "minimum_dtwl_mbgl": round(float(levels.min()), 2),
         "maximum_dtwl_mbgl": round(float(levels.max()), 2),
@@ -426,6 +471,10 @@ def groundwater_observation(state: str, district: str):
 
 def rainfall_forecast(latitude: float, longitude: float):
     """Return the next seven days' rainfall for the selected district."""
+    key = (round(latitude, 3), round(longitude, 3))
+    hit = _rainfall_forecast_cache.get(key)
+    if hit and time.time() - hit["t"] < 15 * 60:
+        return hit["data"]
     try:
         response = requests.get(
             "https://api.open-meteo.com/v1/forecast",
@@ -440,29 +489,46 @@ def rainfall_forecast(latitude: float, longitude: float):
         probabilities = [float(value or 0) for value in daily.get("precipitation_probability_max") or []]
         if not rainfall:
             raise ValueError("no rainfall forecast")
-        return {"available": True, "days": len(rainfall), "rainfall_mm": round(sum(rainfall), 1),
+        data = {"available": True, "days": len(rainfall), "rainfall_mm": round(sum(rainfall), 1),
                 "max_rain_probability": round(max(probabilities), 0) if probabilities else None,
                 "start_date": (daily.get("time") or [None])[0], "source": "Open-Meteo"}
+        _rainfall_forecast_cache[key] = {"t": time.time(), "data": data}
+        return data
     except (ValueError, requests.RequestException) as e:
         log.warning("Rainfall forecast unavailable: %s", e)
         return {"available": False, "message": "Seven-day rainfall forecast is temporarily unavailable."}
 
 
-def water_availability_outlook(groundwater: dict, rainfall: dict):
+def water_availability_outlook(groundwater: dict, rainfall: dict, crop: str):
     """Combine the local monitoring signal with near-term forecast rainfall."""
     if not groundwater.get("available"):
         return {"available": False, "message": groundwater.get("message", "Groundwater monitoring is unavailable.")}
     if not rainfall.get("available"):
         return {"available": False, "message": rainfall.get("message", "Rainfall forecast is unavailable.")}
+    if crop not in RANGES:
+        return {"available": False, "message": "A crop-specific water outlook needs a recommended crop."}
 
     depth, rain = groundwater["median_dtwl_mbgl"], rainfall["rainfall_mm"]
-    if depth <= 5:
-        signal, reason = "FAVOURABLE", "Monitored water level is relatively shallow for this district."
-    elif depth <= 10 or rain >= 20:
-        signal, reason = "CAUTION", "Plan irrigation carefully and monitor field conditions."
+    ideal_low, ideal_high = RANGES[crop]["rainfall"]["ideal"]
+    target = round(((ideal_low + ideal_high) / 2) * rainfall["days"] / 120, 1)
+    coverage = round(rain / target * 100) if target else 0
+    irrigation_gap = round(max(target - rain, 0), 1)
+    if coverage >= 100 and depth <= 10:
+        signal, reason = "FAVOURABLE", "Forecast rainfall meets this crop's short-term rainfall target."
+        irrigation_guidance = "Monitor soil moisture; routine irrigation may be reduced if rainfall arrives as forecast."
+    elif depth > 10 and coverage < 60:
+        signal, reason = "HIGH_WATER_RISK", "The water table is deep and forecast rainfall is below this crop's short-term target."
+        irrigation_guidance = f"Plan about {irrigation_gap} mm of supplemental water over the next {rainfall['days']} days, subject to field conditions."
     else:
-        signal, reason = "HIGH_WATER_RISK", "Monitored water level is deep and little rainfall is forecast."
-    return {"available": True, "signal": signal, "reason": reason, "groundwater": groundwater, "rainfall": rainfall,
+        signal, reason = "CAUTION", "Rainfall and monitored groundwater conditions need active irrigation planning."
+        irrigation_guidance = (f"Forecast rainfall is about {irrigation_gap} mm below the crop target; "
+                               "inspect soil moisture and confirm irrigation access before applying water.")
+    return {"available": True, "signal": signal, "reason": reason, "crop": crop,
+            "crop_rainfall_target_mm": target, "rainfall_coverage_pct": coverage,
+            "irrigation_gap_mm": irrigation_gap, "irrigation_guidance": irrigation_guidance,
+            "data_confidence": groundwater["evidence"],
+            "confidence_note": f"{groundwater['evidence']} monitoring evidence from {groundwater['monitoring_wells']} distinct well locations in the January 2026 snapshot.",
+            "groundwater": groundwater, "rainfall": rainfall,
             "note": "Planning signal only. Confirm farm-level well yield, irrigation access, and soil moisture before planting."}
 
 @app.get("/crops", tags=["General"])
@@ -478,7 +544,7 @@ def crop_detail(crop: str):
 
 @app.get("/schemes", tags=["General"])
 def schemes(crop: str = "rice", state: str = "Telangana"):
-    """Fetch Central and State government schemes specifically applicable to the given recommended crop and state."""
+    """Fetch crop-relevant Central and State/UT government support programmes."""
     crop_name = crop.strip()
     state_name = state.strip()
     matched = get_schemes_for_crop_and_state(crop=crop_name, state=state_name)
@@ -487,6 +553,11 @@ def schemes(crop: str = "rice", state: str = "Telangana"):
         "state": state_name,
         "count": len(matched),
         "schemes": matched,
+        "notice": (
+            "Andaman and Nicobar Islands is a Union Territory. Central schemes are subject to their own eligibility rules. "
+            "For PMFBY, confirm that the crop, area, and season are currently notified by the UT before applying."
+            if normalized_place_name(state_name) == "andamanandnicobarislands" else None
+        ),
     }
 
 
@@ -545,8 +616,23 @@ def evaluate_crop_suitability(crop: str, v: dict, state: Optional[str] = None):
                 soil_dist += 2.0
 
         pts += p
-        dir_text = "Increase" if x < lo_i else "Reduce"
-        adv = None if st == "IDEAL" else f"{dir_text} {tips[f]} towards {lo_i}–{hi_i}"
+        if st == "IDEAL":
+            adv = None
+        elif f == "temperature":
+            direction = "below" if x < lo_i else "above"
+            adv = (f"Current temperature is {direction} this crop's usual range ({lo_i} to {hi_i} degrees C). "
+                   "Consider the sowing window or a crop better suited to current conditions.")
+        elif f == "humidity":
+            direction = "below" if x < lo_i else "above"
+            adv = (f"Current humidity is {direction} this crop's usual range ({lo_i} to {hi_i}%). "
+                   "Use this when planning the crop and monitor moisture-related pest and disease risk.")
+        elif f == "rainfall":
+            direction = "below" if x < lo_i else "above"
+            adv = (f"Seasonal rainfall is {direction} this crop's usual range ({lo_i} to {hi_i} mm). "
+                   "Plan irrigation and drainage according to field conditions; do not assume rainfall can be changed.")
+        else:
+            dir_text = "Increase" if x < lo_i else "Reduce"
+            adv = f"{dir_text} {tips[f]} towards {lo_i}–{hi_i}"
         rows.append({"feature": f, "value": x, "status": st, "ideal": [lo_i, hi_i], "acceptable": [lo_a, hi_a], "advice": adv})
 
     score = round(pts / len(FEATURES) * 100)
@@ -680,7 +766,7 @@ def predict(r: RecommendationRequest):
         "location": {"state": r.location.state, "district": r.location.district},
         "weather": weather,
         "groundwater": groundwater,
-        "water_outlook": water_availability_outlook(groundwater, rainfall),
+        "water_outlook": water_availability_outlook(groundwater, rainfall, recommended_crop),
         "schemes": schemes_list,
     }
 

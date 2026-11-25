@@ -3,8 +3,10 @@
 AI crop recommendation (22 crops) with confidence, out-of-range detection and planning tools. FastAPI serves both the API and the website.
 
 ## Honest scope notes
-- **Dataset:** the uploaded `Crop_recommendation.csv` has 2,200 rows, 22 crops, 7 features (N, P, K, temperature, humidity, pH, rainfall). The Feature Guide PDF describes a different dataset (12 crops, state/season/soil). **State, season and soil type are not ML inputs.** State is only used to filter market prices.
-- **Accuracy (~99.5%)** is genuine for this clean, well-separated dataset; real farm data will score lower.
+- **Dataset:** `Crop_recommendation.csv` has 2,200 rows, 22 crops, and 7 model inputs: N, P, K, temperature, humidity, pH, and rainfall. State, season, and soil type are not ML inputs.
+- **Location support:** the selected district supplies local weather, a seven-day rainfall outlook, the January 2026 groundwater monitoring snapshot, and relevant Central/State/UT support programmes. Location does not itself determine the ML crop result.
+- **Groundwater scope:** the January 2026 data reports depth to water level below ground (mbgl) at monitoring wells. It does not measure total groundwater quantity, well yield, or guaranteed irrigation supply.
+- **Accuracy (~99.5%)** is measured on this clean, well-separated dataset. It is not a guarantee of field performance; real farm results will vary.
 - **Model choice:** Gaussian NB, Random Forest and Extra Trees are statistically tied (CV 0.9915–0.9949). Random Forest is the production model because its probabilities suit confidence analysis. The tie-break result is recorded in `models/metrics.json`.
 - **Indicative data:** prices, yields, costs, fertilizer doses, durations, soil types (`src/crop_advisor/crop_data.py`) are *not* verified. Confirm with ICAR / your state agricultural university. Sponsor entries are placeholders.
 - **Not tested here:** live data.gov.in prices (needs your free API key) and the public Render deployment. Without a key the app shows clearly-labelled reference prices.
@@ -12,7 +14,6 @@ AI crop recommendation (22 crops) with confidence, out-of-range detection and pl
 
 ## Run locally (Windows PowerShell, VS Code terminal)
 ```powershell
-cd crop-advisor
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1      # if blocked: Set-ExecutionPolicy -Scope Process Bypass
 pip install -r requirements.txt

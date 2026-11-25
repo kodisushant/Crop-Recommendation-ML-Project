@@ -667,12 +667,8 @@ pageControllers.index = async function () {
     try {
         const metadata = await fetchApi("/meta");
         const cropsElement = getElement("#h-crops");
-        const accuracyElement = getElement("#h-acc");
-        const modelElement = getElement("#h-model");
 
         if (cropsElement) cropsElement.textContent = metadata.n_crops;
-        if (accuracyElement) accuracyElement.textContent = (metadata.test_accuracy * 100).toFixed(1) + "%";
-        if (modelElement) modelElement.textContent = metadata.best_model;
     } catch (e) {
         console.warn("Could not load homepage metadata", e);
     }
@@ -681,49 +677,7 @@ pageControllers.index = async function () {
 // ----------------------------------------------------------------------------
 // 4.2 Dashboard Page
 // ----------------------------------------------------------------------------
-pageControllers.dashboard = async function () {
-    // 1. Fetch metadata and model performance comparison in parallel
-    const [metadata, metricsData] = await Promise.all([
-        fetchApi("/meta"),
-        fetchApi("/metrics")
-    ]);
-
-    // 2. Populate stats cards
-    getElement("#d-crops").textContent = metadata.n_crops;
-    getElement("#d-model").textContent = metadata.best_model;
-    getElement("#d-acc").textContent = (metadata.test_accuracy * 100).toFixed(1) + "%";
-    getElement("#d-rows").textContent = metadata.rows;
-
-    // 3. Render model comparison bar chart (5-fold CV vs Test Accuracy)
-    renderChart("c-models", {
-        type: "bar",
-        data: {
-            labels: metricsData.comparison.map(m => m.Model),
-            datasets: [
-                {
-                    label: "CV Accuracy",
-                    data: metricsData.comparison.map(m => m["CV Accuracy"] * 100),
-                    backgroundColor: "#174D32"
-                },
-                {
-                    label: "Test Accuracy",
-                    data: metricsData.comparison.map(m => m["Test Accuracy"] * 100),
-                    backgroundColor: "#4C956C"
-                }
-            ]
-        },
-        options: {
-            scales: {
-                y: {
-                    min: 90,
-                    max: 100,
-                    title: { display: true, text: "Accuracy (%)" }
-                }
-            }
-        }
-    });
-
-};
+pageControllers.dashboard = function () {};
 
 // ----------------------------------------------------------------------------
 // 4.3 Crop Recommendation Page
@@ -869,9 +823,10 @@ function displayRecommendationResult(result) {
                         <div><b>${groundwater.median_dtwl_mbgl.toFixed(2)} mbgl</b><span>Median depth to water level</span></div>
                         <div><b>${groundwater.monitoring_wells}</b><span>Monitored wells</span></div>
                         <div><b>${groundwater.minimum_dtwl_mbgl.toFixed(2)}–${groundwater.maximum_dtwl_mbgl.toFixed(2)} mbgl</b><span>Observed range</span></div>
-                        <div><b>${escapeHtml(groundwater.condition)}</b><span>Depth category</span></div>
+                        <div><b>${escapeHtml(groundwater.evidence)}</b><span>Monitoring evidence</span></div>
                     </div>
-                    <p class="note">${escapeHtml(groundwater.observation_month)} data. ${escapeHtml(groundwater.note)}</p>
+                    <p><b>${escapeHtml(groundwater.condition)} depth:</b> water was measured this far below ground at the monitored wells.</p>
+                    <p class="note">Source: ${escapeHtml(groundwater.source)}. Observations dated ${escapeHtml(groundwater.observation_date)}.${groundwater.match_method !== "Exact" ? ` District matched as ${escapeHtml(groundwater.matched_district)} (${escapeHtml(groundwater.match_method.toLowerCase())}).` : ""} ${escapeHtml(groundwater.note)}</p>
                 </div>
             `;
         } else if (result.groundwater) {
@@ -888,11 +843,12 @@ function displayRecommendationResult(result) {
                     <p>${renderBadge(signalClass, outlook.signal.replace(/_/g, " "))} ${escapeHtml(outlook.reason)}</p>
                     <div class="kv">
                         <div><b>${outlook.rainfall.rainfall_mm.toFixed(1)} mm</b><span>Forecast rainfall (${outlook.rainfall.days} days)</span></div>
-                        <div><b>${outlook.rainfall.max_rain_probability === null ? "–" : outlook.rainfall.max_rain_probability.toFixed(0) + "%"}</b><span>Highest rain probability</span></div>
-                        <div><b>${outlook.groundwater.median_dtwl_mbgl.toFixed(2)} mbgl</b><span>January monitored median depth</span></div>
-                        <div><b>${outlook.groundwater.monitoring_wells}</b><span>Monitoring wells used</span></div>
+                        <div><b>${outlook.rainfall_coverage_pct}%</b><span>Crop target covered by forecast</span></div>
+                        <div><b>${outlook.crop_rainfall_target_mm.toFixed(1)} mm</b><span>${escapeHtml(capitalizeFirstLetter(outlook.crop))} 7-day rainfall target</span></div>
+                        <div><b>${outlook.irrigation_gap_mm.toFixed(1)} mm</b><span>Rainfall still needed</span></div>
                     </div>
-                    <p class="note">${escapeHtml(outlook.note)} Rainfall source: ${escapeHtml(outlook.rainfall.source)}.</p>
+                    <p><b>Irrigation guidance:</b> ${escapeHtml(outlook.irrigation_guidance)}</p>
+                    <p class="note"><b>Data confidence: ${escapeHtml(outlook.data_confidence)}.</b> ${escapeHtml(outlook.confidence_note)} ${escapeHtml(outlook.note)} Rainfall source: ${escapeHtml(outlook.rainfall.source)}.</p>
                 </div>
             `;
         } else if (result.water_outlook) {
@@ -2146,6 +2102,7 @@ pageControllers.schemes = async function () {
         try {
             const data = await fetchApi(`/schemes?crop=${encodeURIComponent(cropName)}&state=${encodeURIComponent(stateName)}`);
             const schemes = data.schemes || [];
+            const locationNotice = data.notice ? `<div class="alert" style="margin-top:12px;margin-bottom:0"><b><i class="fa-solid fa-circle-info"></i> Important:</b> ${escapeHtml(data.notice)}</div>` : "";
 
             if (!schemes.length) {
                 resultContainer.innerHTML = `
@@ -2193,8 +2150,9 @@ pageControllers.schemes = async function () {
                         <span class="badge b-ideal">${schemes.length} Schemes Available</span>
                     </div>
                     <p class="note" style="margin-top:6px;margin-bottom:0">
-                        Eligible subsidies, financial grants, crop insurance, and farmer support programs for cultivating <b>${escapeHtml(capitalizeFirstLetter(cropName))}</b> in <b>${escapeHtml(stateName)}</b>.
+                        Possible subsidies, financial grants, crop insurance, and farmer support programs for cultivating <b>${escapeHtml(capitalizeFirstLetter(cropName))}</b> in <b>${escapeHtml(stateName)}</b>. Confirm current eligibility and seasonal notifications with the official department before applying.
                     </p>
+                    ${locationNotice}
                 </div>
                 <div class="schemes-list" style="margin-top:16px">
                     ${cardsHtml}
