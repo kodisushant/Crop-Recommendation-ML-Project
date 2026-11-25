@@ -33,13 +33,13 @@ Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
 
 ## Data and decision scope
 
-The crop recommendation model uses `data/Crop_recommendation.csv`, which contains 2,200 rows, 22 crops, and seven inputs:
+The crop recommendation model evaluates seven factors from `data/Crop_recommendation.csv`, which contains 2,200 rows and 22 crops:
 
 - Nitrogen, phosphorus, and potassium
 - Soil pH
 - Temperature, humidity, and rainfall
 
-State, season, and soil type are not direct model inputs. The selected district is used to provide supporting local context, such as weather, rainfall, groundwater information, and relevant schemes; it does not by itself determine the model recommendation.
+For a crop recommendation, the user enters nitrogen, phosphorus, potassium, and soil pH. Temperature, humidity, and seasonal rainfall are fetched automatically for the selected district. State, season, and soil type are not direct model inputs. The selected district also provides supporting local context, such as groundwater information and relevant schemes; it does not by itself determine the model recommendation.
 
 The groundwater feature uses the January 2026 monitoring snapshot in `data/groundwater_january_2026.csv`. Its depth-to-water-level values are measured below ground level (mbgl). They are not a measurement of total groundwater quantity, well yield, or guaranteed irrigation supply.
 
